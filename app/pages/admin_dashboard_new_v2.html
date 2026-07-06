@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>대시보드 | CMC Health Screening Platform</title>
+  <link rel="stylesheet" href="../styles/main_style_new.css">
+  <link rel="stylesheet" href="../styles/dashboard_style_new.css">
+</head>
+<body>
+
+<!-- 네비게이션 (nav_new.js 주입) -->
+
+<main class="page-wrap" style="margin-top:0; padding-top:22px;">
+
+  <!-- 페이지 헤더 -->
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px">
+    <div>
+      <div class="page-title">📊 운영 대시보드</div>
+      <div class="page-date" id="pageDate"></div>
+    </div>
+    <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+      <div id="lastUpdated" style="font-size:13px;color:var(--gray-500)"></div>
+      <button class="btn btn-outline btn-sm" onclick="dashboardInit()">🔄 새로고침</button>
+      <a href="admin_reservations_new.html" class="btn btn-primary btn-sm">📁 전체 예약관리</a>
+    </div>
+  </div>
+
+  <!-- ■ KPI 카드 5개 -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card kpi-today">
+      <div class="kpi-icon">📅</div>
+      <div class="kpi-label">오늘 예약</div>
+      <div class="kpi-value" id="kpiToday">0</div>
+      <div class="kpi-sub" id="kpiTodaySub">-</div>
+    </div>
+    <div class="kpi-card kpi-접수">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-label">예약접수</div>
+      <div class="kpi-value" id="kpi접수">0</div>
+      <div class="kpi-sub">확인 대기중</div>
+    </div>
+    <div class="kpi-card kpi-확정">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-label">예약확정</div>
+      <div class="kpi-value" id="kpi확정">0</div>
+      <div class="kpi-sub">검진 예정</div>
+    </div>
+    <div class="kpi-card kpi-완료">
+      <div class="kpi-icon">🏥</div>
+      <div class="kpi-label">검진완료</div>
+      <div class="kpi-value" id="kpi완료">0</div>
+      <div class="kpi-sub">누적</div>
+    </div>
+    <div class="kpi-card kpi-취소">
+      <div class="kpi-icon">❌</div>
+      <div class="kpi-label">예약취소</div>
+      <div class="kpi-value" id="kpi취소">0</div>
+      <div class="kpi-sub">누적</div>
+    </div>
+  </div>
+
+  <!-- ■ ROW 1: 오늘 일정 + 이번주 예약현황 -->
+  <div class="dash-grid" style="grid-template-columns:1fr 1fr;margin-bottom:18px">
+
+    <!-- 오늘 일정 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="ch-icon">📆</span>
+        <h2>오늘 일정</h2>
+        <span id="todayCountBadge" style="margin-left:auto;background:var(--primary);color:#fff;font-size:12px;font-weight:700;padding:2px 9px;border-radius:20px">0</span>
+      </div>
+      <div class="card-body" style="padding:14px;max-height:320px;overflow-y:auto">
+        <div class="schedule-list" id="todaySchedule">
+          <div class="schedule-empty">⏳ 오늘 예약된 검진이 없습니다</div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="admin_reservations_new.html" class="btn btn-outline btn-sm">전체 보기</a>
+      </div>
+    </div>
+
+    <!-- 이번주 예약현황 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="ch-icon">📈</span>
+        <h2>이번주 예약현황</h2>
+        <span id="weekRangeLabel" style="margin-left:auto;font-size:12px;color:var(--primary);font-weight:600"></span>
+      </div>
+      <div class="card-body">
+        <div class="week-chart">
+          <div class="week-bars" id="weekBars"></div>
+          <div class="week-legend" id="weekLegend">
+            <span><span class="legend-dot" style="background:#1a4f8a"></span>이번주 예약</span>
+            <span><span class="legend-dot" style="background:#4caf50;outline:2px solid #1a4f8a;outline-offset:1px"></span>오늘</span>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+          <div class="section-tag">이번주 합계</div>
+          <div class="summary-row" id="weekSummary"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ■ ROW 2: 최근 예약목록 + 프로그램별 현황 -->
+  <div class="dash-grid" style="grid-template-columns:3fr 2fr">
+
+    <!-- 최근 예약목록 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="ch-icon">🕐</span>
+        <h2>최근 예약목록</h2>
+        <span style="margin-left:auto;font-size:13px;color:var(--gray-500)">최신 10건</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div class="table-wrap" style="border-radius:0">
+          <table class="recent-table">
+            <thead>
+              <tr>
+                <th>예약번호</th>
+                <th>성명</th>
+                <th>프로그램</th>
+                <th>희망검진일</th>
+                <th>상태</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="recentTable">
+              <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray-500)">데이터 로딩 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="admin_reservations_new.html" class="btn btn-outline btn-sm">전체 예약 관리 →</a>
+      </div>
+    </div>
+
+    <!-- 프로그램별 예약현황 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="ch-icon">🏷️</span>
+        <h2>프로그램별 예약현황</h2>
+      </div>
+      <div class="card-body">
+        <div class="section-tag" id="progTotal"></div>
+        <div class="prog-list" id="progList"></div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- ■ 토스트 -->
+<div id="cmc-toast" style="display:none;opacity:0"></div>
+
+<!-- ■ 푸터 -->
+<footer class="site-footer">
+  <strong>천안의료원 건강검진센터</strong> — CMC Health Screening Platform v1.0<br>
+  <span style="font-size:12px;opacity:0.6">시제품 | 실제 운영 전 서버 DB·로그인·보안 전환 필요 | 문의: 041-570-7777</span>
+</footer>
+
+<!-- 스크립트 로드 순서: 설정 → 상수 → 데이터 → 서비스 → Sheets서비스 → 컴포넌트 → 페이지 로직 -->
+<script src="../config_v2_new.js"></script>
+<script src="../data/programs_data_new.js"></script>
+<script src="../data/sample_data_new.js"></script>
+<script src="../services/db_service_new.js"></script>
+<script src="../services/stats_service_new.js"></script>
+<script src="../services/dashboard_sheets_service_new.js"></script>
+<script src="../components/nav_new.js"></script>
+<script>
+'use strict';
+
+/* ── 초기화 (async: Google Sheets 실시간 연동 지원) ── */
+async function dashboardInit() {
+  CMC_CONFIG.load();   // localStorage에서 webAppUrl 복원
+
+  let summary    = null;
+  let weekList   = null;
+  let recentList = null;
+  let source     = 'local';
+
+  if (CMC_DashboardSheets.isLive()) {
+    // ── Sheets 모드: 3-call 배치 로드 ──────────────────────────────
+    const result = await CMC_DashboardSheets.loadAll();
+    source = result.source;
+    if (source === 'sheets') {
+      summary    = result.summary;
+      weekList   = result.weekList;
+      recentList = result.recentList;
+    } else {
+      // GAS 오류 → localStorage 폴백
+      CMC_DB.initSampleIfEmpty();
+    }
+  } else {
+    // ── Local 모드: localStorage 폴백 ──────────────────────────────
+    CMC_DB.initSampleIfEmpty();
+  }
+
+  renderPageHeader();
+  renderKPI(summary, weekList);
+  renderTodaySchedule(weekList);
+  renderWeeklyChart(weekList);
+  renderRecentTable(recentList);
+  renderProgramBreakdown(recentList);
+
+  const sourceLabel = source === 'sheets' ? '📡 Sheets 실시간' : '💾 로컬 데이터';
+  document.getElementById('lastUpdated').textContent =
+    `${sourceLabel} · 업데이트: ${new Date().toLocaleTimeString('ko-KR')}`;
+}
+
+/* ── 페이지 헤더 날짜 ── */
+function renderPageHeader() {
+  document.getElementById('pageDate').textContent = CMC.todayKR();
+  const { monStr, sunStr } = CMC.weekRange();
+  const fmt = s => s.replace(/-/g,'.').slice(2);
+  document.getElementById('weekRangeLabel').textContent = `${fmt(monStr)} ~ ${fmt(sunStr)}`;
+}
+
+/* ── KPI 카드 ──
+   summary: GAS ?action=summary 응답 data, null이면 localStorage 폴백
+   weekList: GAS ?action=list 이번주 배열, null이면 폴백
+*/
+function renderKPI(summary, weekList) {
+  const counts = CMC_DashboardSheets.statusCounts(summary);
+  const kpi    = CMC_DashboardSheets.todayKPI(summary, weekList);
+  setText('kpiToday',  kpi.todayActive);
+  setText('kpi접수',   counts['예약접수']);
+  setText('kpi확정',   counts['예약확정']);
+  setText('kpi완료',   counts['검진완료']);
+  setText('kpi취소',   counts['예약취소']);
+  setText('kpiTodaySub', kpi.todaySleep > 0 ? `💤 수면 ${kpi.todaySleep}건 포함` : '일반 검진');
+}
+
+/* ── 오늘 일정 ──
+   weekList: GAS 이번주 배열(null이면 CMC_Stats 폴백)
+*/
+function renderTodaySchedule(weekList) {
+  const list = CMC_DashboardSheets.todaySchedule(weekList);
+  const wrap = document.getElementById('todaySchedule');
+  document.getElementById('todayCountBadge').textContent = list.length;
+
+  if (!list.length) {
+    wrap.innerHTML = '<div class="schedule-empty">⏳ 오늘 예약된 검진이 없습니다</div>';
+    return;
+  }
+  const prog = p => CMC.PROGRAMS.find(x => x.id === p) || {};
+  wrap.innerHTML = list.map(r => {
+    const p    = prog(r.program);
+    const meta = CMC.STATUS[r.status] || {};
+    return `
+      <div class="schedule-item">
+        <div class="schedule-time">${CMC.esc(r.wishTime)}</div>
+        <div class="schedule-info">
+          <div class="schedule-name">${CMC.esc(r.name)}</div>
+          <div class="schedule-prog">${CMC.esc(r.program)}${r.company ? ' · ' + CMC.esc(r.company) : ''}</div>
+        </div>
+        <div class="schedule-badges">
+          ${r.sleep === '수면' ? '<span title="수면검진">💤</span>' : ''}
+          <span class="status-badge ${meta.cls || ''}">${meta.icon || ''} ${CMC.esc(r.status)}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ── 이번주 차트 ──
+   weekList: GAS 이번주 배열(null이면 CMC_Stats 폴백)
+*/
+function renderWeeklyChart(weekList) {
+  const { labels, counts, max } = CMC_DashboardSheets.weeklyData(weekList);
+  const todayDow = new Date().getDay();
+  const todayIdx = todayDow === 0 ? 6 : todayDow - 1;
+
+  const colors = ['#3b82f6','#10b981','#1a4f8a','#8b5cf6','#f59e0b','#ef4444','#6b7280'];
+
+  const barsHTML = labels.map((label, i) => {
+    const h      = counts[i] > 0 ? Math.max(12, Math.round(counts[i] / max * 120)) : 4;
+    const isT    = i === todayIdx;
+    const color  = isT ? '#1a4f8a' : colors[i];
+    const opacity= counts[i] === 0 ? '0.3' : '1';
+    return `
+      <div class="week-bar-wrap">
+        <div class="week-bar-col">
+          <div class="week-bar-count" style="opacity:${opacity}">${counts[i] || ''}</div>
+          <div class="week-bar ${isT ? 'today-bar' : ''}"
+               style="height:${h}px;background:${color};opacity:${opacity};"
+               title="${label}요일: ${counts[i]}건"></div>
+        </div>
+        <div class="week-bar-label ${isT ? 'today' : ''}">${label}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('weekBars').innerHTML = barsHTML;
+
+  const total  = counts.reduce((s,v) => s+v, 0);
+  const active = counts.filter(v => v > 0).length;
+  document.getElementById('weekSummary').innerHTML = `
+    <div class="summary-chip"><span class="sc-val">${total}</span><span>이번주 합계</span></div>
+    <div class="summary-chip"><span class="sc-val">${counts[todayIdx]}</span><span>오늘</span></div>
+    <div class="summary-chip"><span class="sc-val">${active}일</span><span>예약 있는 날</span></div>
+    <div class="summary-chip"><span class="sc-val">${total ? Math.round(total/active) : 0}</span><span>일 평균</span></div>`;
+}
+
+/* ── 최근 예약목록 ──
+   recentList: GAS 최근30일 배열(null이면 CMC_Stats 폴백)
+*/
+function renderRecentTable(recentList) {
+  const list  = CMC_DashboardSheets.recentN(recentList, 10);
+  const tbody = document.getElementById('recentTable');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray-500)">예약 데이터가 없습니다</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(r => {
+    const meta = CMC.STATUS[r.status] || {};
+    return `
+      <tr>
+        <td class="td-no">${CMC.esc(r.reservationNo)}</td>
+        <td class="td-name">${CMC.esc(r.name)}</td>
+        <td><span style="font-size:13px">${CMC.esc(r.program)}</span></td>
+        <td class="td-date">${CMC.esc(r.wishDate)} <span style="color:var(--gray-500);font-weight:400">${CMC.esc(r.wishTime)}</span></td>
+        <td><span class="status-badge ${meta.cls||''}">${meta.icon||''} ${CMC.esc(r.status)}</span></td>
+        <td><a href="admin_reservations_new.html" class="btn btn-outline btn-sm" style="font-size:12px;padding:5px 10px">관리</a></td>
+      </tr>`;
+  }).join('');
+}
+
+/* ── 프로그램별 현황 ──
+   recentList: GAS 최근30일 배열(null이면 CMC_Stats 폴백)
+*/
+function renderProgramBreakdown(recentList) {
+  const data  = CMC_DashboardSheets.programBreakdown(recentList);
+  const total = data.reduce((s, p) => s + p.count, 0);
+  document.getElementById('progTotal').textContent = `활성 예약 ${total}건 기준`;
+
+  document.getElementById('progList').innerHTML = data.map(p => `
+    <div class="prog-item">
+      <div class="prog-header">
+        <div class="prog-name-wrap">
+          <span class="prog-dot" style="background:${p.color}"></span>
+          <span class="prog-name">${CMC.esc(p.name)}</span>
+        </div>
+        <div class="prog-stats">
+          <span style="font-weight:700;color:${p.color}">${p.count}건</span>
+          <span>${p.pct}%</span>
+        </div>
+      </div>
+      <div class="prog-bar-bg">
+        <div class="prog-bar-fill" style="width:${p.pct}%;background:${p.color}"></div>
+      </div>
+    </div>`).join('');
+}
+
+/* ── 유틸 ── */
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val ?? 0;
+}
+
+/* ── 실행 ── */
+document.addEventListener('DOMContentLoaded', () => {
+  CMC_Nav.render('dashboard');
+  dashboardInit();
+  // 1분마다 자동 새로고침
+  setInterval(dashboardInit, 60000);
+});
+</script>
+</body>
+</html>
