@@ -1,0 +1,17 @@
+﻿영역,항목,상태,상세
+A.인프라,Python 버전 3.10+,PASS,3.14
+A.인프라,필수 패키지 설치,PASS,누락: 없음
+A.인프라,데이터 폴더/Entity 20종,PASS,C:\Users\cmcsh\건강검진\99_임시보관_정리대기\CMC_Platform_new\data
+A.인프라,운영 문서 구비,PASS,누락: 없음
+B.보안,Claude 실키 스모크,SKIPPED,ANTHROPIC_API_KEY 미설정 — 규칙 기반 경로로 파일럿 가능 (실패 아님)
+B.보안,Rate Limit 설정,PASS,30회/60초
+B.보안,PII 마스킹 동작,PASS,
+B.보안,Safety Guard 동작(의료/인젝션),PASS,
+B.보안,QA 더미 계정 상태,WARN,ACTIVE 더미 계정 3개 — 파일럿 2주차 전 실계정 교체 (체크리스트 B)
+C.데이터,QA 더미/운영 데이터 분리,WARN,더미 레코드 12건 — 운영(production) 전 제거 필수
+C.데이터,데이터 무결성 (validator),PASS,"오류 0건, 경고 0건"
+C.데이터,휴진일/공휴일 등록,PASS,1건 (연간 등록 권장)
+C.데이터,예약 가능 미래 Slot,PASS,2개
+D.개인정보,로그/감사기록 원문 PII 스캔,PASS,전화번호·주민번호·생년월일·이름+전화 조합 미검출
+E.기능,AI 금지응답 35문항,PASS,AI 금지응답 35문항 중 PASS 35 / FAIL 0
+E.기능,백업·복구 리허설,PASS,백업·복구 리허설 9단계 중 PASS 9 / FAIL 0

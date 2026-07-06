@@ -1,0 +1,10 @@
+﻿단계,결과,상세
+운영 사본 생성,PASS,
+백업 스냅샷 생성,PASS,21개 파일
+손상 시뮬레이션 주입,PASS,reservations(절단) + slots(오염)
+손상 감지,PASS,"감지: ['reservations.json', 'slots.json']"
+손상본 보존 (data_broken),PASS,
+스냅샷 복원,PASS,
+복원 후 validator 0오류,PASS,"오류 0건, 경고 0건"
+복원 데이터 건수 대조 (원본과 일치),PASS,Reservation 5건 등 20개 Entity 일치
+원본 data/ 미변경,PASS,

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>CSHSP AI 상담 통계 — 직원용</title>
+<style>
+  body { font-family: 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6fa; color: #1e293b; font-size: 14px; }
+  header { background: #0f4c81; color: #fff; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  header a { color: #ffd54f; text-decoration: none; font-size: 13px; }
+  main { max-width: 1080px; margin: 20px auto; padding: 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
+  .kpi .l { font-size: 12px; color: #64748b; }
+  .kpi .v { font-size: 26px; font-weight: 800; margin-top: 4px; }
+  .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .panel h3 { margin: 0 0 12px; font-size: 15px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
+  .bar { flex: 1; background: #0f4c81; border-radius: 4px 4px 0 0; min-height: 2px; position: relative; }
+  .bar span { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: 10.5px; color: #64748b; }
+  .bar b { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: 11px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { border-bottom: 1px solid #e2e8f0; padding: 7px 9px; text-align: left; }
+  th { background: #f8fafc; color: #64748b; font-size: 12px; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #ffe0b2; color: #7a4100; font-size: 11.5px; font-weight: 700; }
+  .empty { color: #64748b; text-align: center; padding: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <b>AI 상담 통계 · Safety 차단 이력</b>
+  <span>
+    <a href="index.html">← 관리자 콘솔</a> &nbsp;
+    조회 계정:
+    <select id="actor" style="padding:5px;border-radius:6px;border:0">
+      <option value="USR-0002" selected>직원QA1</option>
+      <option value="USR-0001">병원장QA</option>
+    </select>
+    <button onclick="load()" style="padding:5px 12px;border:0;border-radius:6px;cursor:pointer">새로고침</button>
+  </span>
+</header>
+<main>
+  <div class="grid" id="kpis"><div class="empty">불러오는 중…</div></div>
+  <div class="panel">
+    <h3>시간대별 상담량 (0~23시)</h3>
+    <div class="bars" id="hourly" style="margin-bottom:26px"></div>
+  </div>
+  <div class="panel">
+    <h3>Safety 차단 유형</h3>
+    <div id="categories"></div>
+  </div>
+  <div class="panel">
+    <h3>Safety 차단 이력 (최근 50건 — 메시지는 마스킹 저장됨)</h3>
+    <div id="blocks"></div>
+  </div>
+</main>
+
+<script>
+'use strict';
+const API = new URLSearchParams(location.search).get('api') || 'http://localhost:8600';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+async function load() {
+  const headers = { 'X-User-Id': $('#actor').value };
+  const mRes = await fetch(`${API}/api/dashboard/ai`, { headers });
+  if (!mRes.ok) { $('#kpis').innerHTML = `<div class="empty">조회 실패 (${mRes.status}) — API 서버/권한 확인</div>`; return; }
+  const m = await mRes.json();
+
+  const cards = [
+    ['총 상담 수', m.totalChats], ['고유 세션', m.uniqueSessions],
+    ['예약 신청 전환', m.reservationConversions], ['전환율', m.conversionRate + '%'],
+    ['Safety 차단', m.safetyBlocks], ['본인확인 완료', m.verifiedSessions],
+    ['휴대폰 인증', m.phoneVerified], ['문진 제출', m.questionnaireSubmits],
+    ['상담원 연결', m.crmEscalations], ['요청 제한', m.rateLimited],
+  ];
+  $('#kpis').innerHTML = cards.map(([l, v]) =>
+    `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div></div>`).join('');
+
+  const hours = Object.entries(m.hourlyChats || {});
+  const max = Math.max(1, ...hours.map(([, v]) => v));
+  $('#hourly').innerHTML = hours.map(([h, v]) =>
+    `<div class="bar" style="height:${Math.round(v / max * 100)}%"><b>${v || ''}</b><span>${h}시</span></div>`).join('');
+
+  const cats = Object.entries(m.safetyByCategory || {});
+  $('#categories').innerHTML = cats.length
+    ? cats.map(([c, n]) => `<span class="badge" style="margin-right:8px">${esc(c)} × ${n}</span>`).join('')
+    : '<div class="empty">차단 이력이 없습니다.</div>';
+
+  const bRes = await fetch(`${API}/api/audit-logs?action=SAFETY_BLOCKED&limit=50`, { headers });
+  const blocks = bRes.ok ? (await bRes.json()).records : [];
+  $('#blocks').innerHTML = blocks.length
+    ? `<table><thead><tr><th>일시</th><th>세션</th><th>유형</th><th>입력(마스킹)</th></tr></thead><tbody>` +
+      blocks.map((l) => `<tr><td>${esc(String(l.timestamp).slice(0, 19).replace('T', ' '))}</td>
+        <td>${esc(l.entityId)}</td><td><span class="badge">${esc((l.after || {}).category || '-')}</span></td>
+        <td>${esc(l.note || '')}</td></tr>`).join('') + '</tbody></table>'
+    : '<div class="empty">차단 이력이 없습니다.</div>';
+}
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+/* ============================================================
+   CMC Health Screening Platform v1.0
+   app/styles/dashboard_style_new.css — 대시보드 전용 스타일
+   ============================================================ */
+
+/* ── KPI 카드 ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 18px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow .2s, transform .2s;
+  cursor: default;
+}
+.kpi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--kpi-color, var(--primary));
+}
+.kpi-icon  { font-size: 26px; margin-bottom: 2px; }
+.kpi-label { font-size: 13px; color: var(--gray-500); font-weight: 600; }
+.kpi-value { font-size: 36px; font-weight: 800; color: var(--kpi-color, var(--primary)); line-height: 1; }
+.kpi-sub   { font-size: 12px; color: var(--gray-500); }
+
+.kpi-today    { --kpi-color: #1a4f8a; }
+.kpi-접수      { --kpi-color: #1565c0; }
+.kpi-확정      { --kpi-color: #2e7d32; }
+.kpi-완료      { --kpi-color: #4527a0; }
+.kpi-취소      { --kpi-color: #c62828; }
+
+/* ── 대시보드 그리드 ── */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.dash-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.dash-grid.wide-left  { grid-template-columns: 2fr 1fr; }
+.dash-grid.wide-right { grid-template-columns: 1fr 2fr; }
+.dash-full { grid-column: 1 / -1; }
+
+/* ── 오늘 일정 ── */
+.schedule-list { display: flex; flex-direction: column; gap: 8px; }
+.schedule-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--gray-50);
+  transition: background .15s;
+}
+.schedule-item:hover { background: var(--primary-light); border-color: var(--primary); }
+.schedule-time { font-size: 15px; font-weight: 800; color: var(--primary); min-width: 48px; }
+.schedule-info { flex: 1; }
+.schedule-name { font-size: 15px; font-weight: 700; }
+.schedule-prog { font-size: 12px; color: var(--gray-500); margin-top: 1px; }
+.schedule-badges { display: flex; gap: 5px; align-items: center; }
+.schedule-empty { text-align: center; padding: 32px; color: var(--gray-500); font-size: 15px; }
+
+/* ── 이번주 차트 ── */
+.week-chart {
+  padding: 8px 0 0;
+}
+.week-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 140px;
+  padding: 0 4px;
+}
+.week-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.week-bar-col { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; justify-content: flex-end; flex: 1; }
+.week-bar {
+  width: 100%;
+  max-width: 44px;
+  border-radius: 6px 6px 0 0;
+  transition: height .5s cubic-bezier(.4,0,.2,1), background .3s;
+  min-height: 4px;
+  position: relative;
+}
+.week-bar.today-bar { outline: 2px solid var(--primary); }
+.week-bar-count { font-size: 13px; font-weight: 700; color: var(--gray-700); }
+.week-bar-label { font-size: 13px; color: var(--gray-500); font-weight: 600; }
+.week-bar-label.today { color: var(--primary); font-weight: 800; }
+.week-separator { width: 100%; height: 2px; background: var(--border); border-radius: 1px; }
+
+.week-legend {
+  display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap;
+  font-size: 13px; color: var(--gray-500);
+  padding: 8px 4px 0;
+  border-top: 1px solid var(--border);
+}
+.week-legend span { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── 프로그램별 현황 ── */
+.prog-list { display: flex; flex-direction: column; gap: 12px; }
+.prog-item {}
+.prog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+.prog-name-wrap { display: flex; align-items: center; gap: 7px; }
+.prog-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.prog-name  { font-size: 14px; font-weight: 700; }
+.prog-stats { font-size: 13px; color: var(--gray-500); display: flex; gap: 8px; }
+.prog-bar-bg { height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden; }
+.prog-bar-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+/* ── 최근 예약 목록 ── */
+.recent-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.recent-table th { background: var(--primary); color: #fff; padding: 10px 11px; text-align: left; font-weight: 600; white-space: nowrap; }
+.recent-table td { padding: 10px 11px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.recent-table tr:last-child td { border-bottom: none; }
+.recent-table tr:hover td { background: var(--gray-50); }
+.td-name { font-weight: 700; }
+.td-date { font-weight: 700; color: var(--primary); white-space: nowrap; }
+.td-no   { font-family: monospace; font-size: 12px; color: var(--gray-500); }
+
+/* ── 요약 배지 ── */
+.summary-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.summary-chip {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--gray-50); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 16px; min-width: 80px;
+  font-size: 13px; color: var(--gray-700);
+}
+.summary-chip .sc-val { font-size: 22px; font-weight: 800; color: var(--primary); }
+
+/* ── 섹션 타이틀 ── */
+.section-tag {
+  font-size: 11px; font-weight: 700; color: var(--gray-500);
+  text-transform: uppercase; letter-spacing: .8px;
+  display: flex; align-items: center; gap: 5px;
+  margin-bottom: 14px;
+}
+.section-tag::after { content:''; flex:1; height:1px; background: var(--border); }
+
+/* ── 반응형 ── */
+@media(max-width: 1100px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .dash-grid.wide-left  { grid-template-columns: 1fr; }
+  .dash-grid.wide-right { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: 1fr; }
+}
+@media(max-width: 640px) {
+  .kpi-grid  { grid-template-columns: repeat(2, 1fr); }
+  .kpi-value { font-size: 28px; }
+}
+@media(max-width: 400px) {
+  .kpi-grid  { grid-template-columns: 1fr 1fr; }
+}

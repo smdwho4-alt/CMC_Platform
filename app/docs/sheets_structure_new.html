@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google Sheets 구조도 — CMC 예약현황</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', sans-serif; background: #f5f7fa; color: #222; padding: 24px; }
+  h1  { font-size: 20px; color: #1a4f8a; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+  h2  { font-size: 14px; color: #1a4f8a; margin: 24px 0 12px; border-left: 4px solid #1a4f8a; padding-left: 10px; }
+
+  /* ── 시트 미리보기 ── */
+  .sheet-wrap { overflow-x: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  .sheet-table { border-collapse: collapse; font-size: 11px; min-width: 1400px; }
+  .sheet-table th {
+    padding: 6px 8px; text-align: center; font-size: 10px;
+    white-space: nowrap; border: 1px solid #c0c0c0; position: sticky; top: 0;
+  }
+  .th-col-num  { background: #e0e0e0; color: #444; width: 28px; }
+  .th-existing { background: #1a4f8a; color: #fff; }
+  .th-new      { background: #2e7d32; color: #fff; }
+  .th-row-num  { background: #e0e0e0; color: #444; }
+
+  .sheet-table td {
+    padding: 4px 8px; border: 1px solid #e0e0e0; white-space: nowrap;
+    max-width: 120px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .td-rownum { background: #f5f5f5; color: #888; text-align: center; font-size: 10px; }
+  .td-sample { background: #fff; }
+  .td-new    { background: #f1f8f2; }
+  .td-auto   { color: #888; font-style: italic; }
+  .td-enum   { color: #1a4f8a; font-weight: 600; }
+  .td-empty  { color: #ddd; }
+  .td-pk     { font-family: monospace; color: #7b1fa2; font-weight: 700; }
+
+  .col-letter {
+    background: #f5f5f5; color: #777; text-align: center;
+    font-size: 10px; font-family: monospace; border: 1px solid #e0e0e0; padding: 3px;
+  }
+
+  /* ── 컬럼 상세 테이블 ── */
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff;
+                  border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .detail-table th { background: #f0f4ff; color: #1a4f8a; padding: 7px 12px; text-align: left; font-size: 11px; border-bottom: 2px solid #c8d8f0; }
+  .detail-table td { padding: 5px 12px; border-bottom: 1px solid #f0f0f0; font-size: 11px; }
+  .detail-table tr:hover td { background: #f8f9ff; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+  .b-pk    { background: #fff3cd; color: #856404; }
+  .b-auto  { background: #e8f5e9; color: #2e7d32; }
+  .b-req   { background: #fde8e8; color: #c62828; }
+  .b-opt   { background: #f3f3f3; color: #555; }
+  .b-new   { background: #e8f5e9; color: #1b5e20; }
+  .b-ts    { background: #e8f0fe; color: #1a4f8a; }
+
+  .group-label { font-weight: 700; color: #fff; padding: 5px 12px; font-size: 11px; }
+  .gl-blue  { background: #1a4f8a; }
+  .gl-green { background: #2e7d32; }
+
+  .tip-box { background: #fff8e1; border-left: 4px solid #ffc107; padding: 10px 14px; border-radius: 4px; font-size: 12px; margin: 8px 0; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<h1>📊 Google Sheets 구조도 — 예약현황 시트</h1>
+<p class="subtitle">CMC Health Screening Platform v1.0 Phase 4.5 | 천안의료원 건강검진센터 | 2026-07-01</p>
+
+<!-- ── 시트 미리보기 ── -->
+<h2>1. 시트 컬럼 미리보기 (예약현황)</h2>
+<div class="sheet-wrap">
+<table class="sheet-table">
+  <thead>
+    <tr>
+      <th class="th-col-num"></th>
+      <!-- 기존 18개 -->
+      <th class="th-existing">A<br>예약번호</th>
+      <th class="th-existing">B<br>접수일시</th>
+      <th class="th-existing">C<br>성명</th>
+      <th class="th-existing">D<br>생년월일</th>
+      <th class="th-existing">E<br>연락처</th>
+      <th class="th-existing">F<br>성별</th>
+      <th class="th-existing">G<br>검진프로그램</th>
+      <th class="th-existing">H<br>희망검진일</th>
+      <th class="th-existing">I<br>희망시간</th>
+      <th class="th-existing">J<br>수면</th>
+      <th class="th-existing">K<br>선택검사</th>
+      <th class="th-existing">L<br>사업장</th>
+      <th class="th-existing">M<br>예약경로</th>
+      <th class="th-existing">N<br>담당자</th>
+      <th class="th-existing">O<br>예약상태</th>
+      <th class="th-existing">P<br>예약확정일</th>
+      <th class="th-existing">Q<br>문자발송</th>
+      <th class="th-existing">R<br>특이사항</th>
+      <!-- 추가 11개 -->
+      <th class="th-new">S<br>검진예정시간</th>
+      <th class="th-new">T<br>접수시간</th>
+      <th class="th-new">U<br>검진시작</th>
+      <th class="th-new">V<br>검진종료</th>
+      <th class="th-new">W<br>검진실</th>
+      <th class="th-new">X<br>문진의사</th>
+      <th class="th-new">Y<br>담당간호사</th>
+      <th class="th-new">Z<br>예상비용</th>
+      <th class="th-new">AA<br>결제상태</th>
+      <th class="th-new">AB<br>결과발송</th>
+      <th class="th-new">AC<br>재예약여부</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- 샘플 행 1 -->
+    <tr>
+      <td class="td-rownum">2</td>
+      <td class="td-sample td-pk">20260701-0001</td>
+      <td class="td-sample td-auto">2026-07-01 09:05:23</td>
+      <td class="td-sample">홍길동</td>
+      <td class="td-sample">1975-04-20</td>
+      <td class="td-sample">010-1234-5678</td>
+      <td class="td-sample td-enum">남</td>
+      <td class="td-sample td-enum">VIP</td>
+      <td class="td-sample">2026-07-15</td>
+      <td class="td-sample">09:00</td>
+      <td class="td-sample td-enum">미선택</td>
+      <td class="td-sample">위내시경, 복부초음파</td>
+      <td class="td-sample td-empty">—</td>
+      <td class="td-sample td-enum">온라인</td>
+      <td class="td-sample">김담당</td>
+      <td class="td-sample td-enum" style="color:#2e7d32;">예약확정</td>
+      <td class="td-sample td-auto">2026-07-02 10:15:00</td>
+      <td class="td-sample td-enum">Y</td>
+      <td class="td-sample td-empty">—</td>
+      <td class="td-new">09:00</td>
+      <td class="td-new td-empty">—</td>
+      <td class="td-new td-empty">—</td>
+      <td class="td-new td-empty">—</td>
+      <td class="td-new">1검진실</td>
+      <td class="td-new">이의사</td>
+      <td class="td-new">박간호사</td>
+      <td class="td-new">450000</td>
+      <td class="td-new td-enum">미결제</td>
+      <td class="td-new td-enum">미발송</td>
+      <td class="td-new td-enum">해당없음</td>
+    </tr>
+    <!-- 샘플 행 2 (검진완료) -->
+    <tr>
+      <td class="td-rownum">3</td>
+      <td class="td-sample td-pk">20260701-0002</td>
+      <td class="td-sample td-auto">2026-07-01 09:12:00</td>
+      <td class="td-sample">김순자</td>
+      <td class="td-sample">1968-09-15</td>
+      <td class="td-sample">010-9876-5432</td>
+      <td class="td-sample td-enum">여</td>
+      <td class="td-sample td-enum">BASIC</td>
+      <td class="td-sample">2026-07-01</td>
+      <td class="td-sample">08:30</td>
+      <td class="td-sample td-enum">미선택</td>
+      <td class="td-sample td-empty">—</td>
+      <td class="td-sample">천안산업(주)</td>
+      <td class="td-sample td-enum">협약</td>
+      <td class="td-sample">이담당</td>
+      <td class="td-sample td-enum" style="color:#7b1fa2;">검진완료</td>
+      <td class="td-sample td-auto">2026-06-30 14:00:00</td>
+      <td class="td-sample td-enum">Y</td>
+      <td class="td-sample">혈압약 복용 중</td>
+      <td class="td-new">08:30</td>
+      <td class="td-new td-auto">2026-07-01 08:28:12</td>
+      <td class="td-new td-auto">2026-07-01 08:35:00</td>
+      <td class="td-new td-auto">2026-07-01 10:42:00</td>
+      <td class="td-new">2검진실</td>
+      <td class="td-new">최의사</td>
+      <td class="td-new">정간호사</td>
+      <td class="td-new">120000</td>
+      <td class="td-new td-enum" style="color:#2e7d32;">결제완료</td>
+      <td class="td-new td-enum" style="color:#1565c0;">발송완료</td>
+      <td class="td-new td-enum" style="color:#e65100;">재예약예정</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div style="margin-top:8px; display:flex; gap:16px; flex-wrap:wrap; font-size:11px;">
+  <span><span style="display:inline-block;width:12px;height:12px;background:#1a4f8a;margin-right:4px;vertical-align:middle;"></span>기존 컬럼 (Phase 4, 18개)</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#2e7d32;margin-right:4px;vertical-align:middle;"></span>추가 컬럼 (Phase 4.5, 11개)</span>
+</div>
+
+<!-- ── 컬럼 상세 ── -->
+<h2>2. 전체 컬럼 상세 정의</h2>
+<table class="detail-table">
+  <thead>
+    <tr><th>열</th><th>컬럼명</th><th>영문 필드</th><th>타입</th><th>속성</th><th>기본값</th><th>입력주체</th><th>비고</th></tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="8" class="group-label gl-blue">■ 예약 정보 — Phase 4 기존 18개</td></tr>
+    <tr><td>A</td><td>예약번호</td><td>reservationNo</td><td>STRING</td><td><span class="badge b-pk">PK</span> <span class="badge b-auto">자동</span></td><td>—</td><td>시스템</td><td>YYYYMMDD-NNNN</td></tr>
+    <tr><td>B</td><td>접수일시</td><td>createdAt</td><td>DATETIME</td><td><span class="badge b-auto">자동</span></td><td>—</td><td>시스템</td><td>Apps Script 서버 타임스탬프</td></tr>
+    <tr><td>C</td><td>성명</td><td>name</td><td>STRING</td><td><span class="badge b-req">필수</span></td><td>—</td><td>수검자</td><td>개인정보</td></tr>
+    <tr><td>D</td><td>생년월일</td><td>birth</td><td>DATE</td><td><span class="badge b-req">필수</span></td><td>—</td><td>수검자</td><td>YYYY-MM-DD, 개인정보</td></tr>
+    <tr><td>E</td><td>연락처</td><td>phone</td><td>STRING</td><td><span class="badge b-req">필수</span></td><td>—</td><td>수검자</td><td>010-XXXX-XXXX, 개인정보</td></tr>
+    <tr><td>F</td><td>성별</td><td>gender</td><td>ENUM</td><td><span class="badge b-req">필수</span></td><td>—</td><td>수검자</td><td>남 / 여</td></tr>
+    <tr><td>G</td><td>검진프로그램</td><td>program</td><td>ENUM</td><td><span class="badge b-req">필수</span></td><td>—</td><td>수검자</td><td>BASIC·SMART·VIP·PREMIUM·YOUNG·온김에</td></tr>
+    <tr><td>H</td><td>희망검진일</td><td>wishDate</td><td>DATE</td><td><span class="badge b-req">필수</span></td><td>—</td><td>수검자</td><td>YYYY-MM-DD</td></tr>
+    <tr><td>I</td><td>희망시간</td><td>wishTime</td><td>TIME</td><td><span class="badge b-req">필수</span></td><td>—</td><td>수검자</td><td>HH:mm</td></tr>
+    <tr><td>J</td><td>수면</td><td>sleep</td><td>ENUM</td><td><span class="badge b-opt">선택</span></td><td>미선택</td><td>수검자</td><td>수면선택 / 미선택</td></tr>
+    <tr><td>K</td><td>선택검사</td><td>optionalTests</td><td>STRING</td><td><span class="badge b-opt">선택</span></td><td>—</td><td>수검자</td><td>콤마 구분</td></tr>
+    <tr><td>L</td><td>사업장</td><td>company</td><td>STRING</td><td><span class="badge b-opt">선택</span></td><td>—</td><td>수검자/행정</td><td>협약·출장검진 시</td></tr>
+    <tr><td>M</td><td>예약경로</td><td>route</td><td>ENUM</td><td><span class="badge b-opt">선택</span></td><td>온라인</td><td>시스템/행정</td><td>온라인·전화·방문·협약</td></tr>
+    <tr><td>N</td><td>담당자</td><td>manager</td><td>STRING</td><td><span class="badge b-opt">선택</span></td><td>—</td><td>행정</td><td>예약 처리 직원</td></tr>
+    <tr><td>O</td><td>예약상태</td><td>status</td><td>ENUM</td><td><span class="badge b-req">필수</span></td><td>예약접수</td><td>시스템/행정</td><td>6가지 상태 전이</td></tr>
+    <tr><td>P</td><td>예약확정일</td><td>confirmedAt</td><td>DATETIME</td><td><span class="badge b-auto">자동</span></td><td>—</td><td>시스템</td><td>확정 처리 시 자동기록</td></tr>
+    <tr><td>Q</td><td>문자발송</td><td>smsSent</td><td>ENUM</td><td><span class="badge b-auto">자동</span></td><td>N</td><td>시스템</td><td>Y / N</td></tr>
+    <tr><td>R</td><td>특이사항</td><td>note</td><td>TEXT</td><td><span class="badge b-opt">선택</span></td><td>—</td><td>수검자/행정</td><td>자유 메모</td></tr>
+
+    <tr><td colspan="8" class="group-label gl-green">■ 운영 정보 — Phase 4.5 추가 11개</td></tr>
+    <tr><td>S</td><td>검진예정시간</td><td>scheduledTime</td><td>TIME</td><td><span class="badge b-new">추가</span> <span class="badge b-opt">선택</span></td><td>—</td><td>행정</td><td>실제 배정 검진시간 (HH:mm)</td></tr>
+    <tr><td>T</td><td>접수시간</td><td>checkinTime</td><td>DATETIME</td><td><span class="badge b-new">추가</span> <span class="badge b-ts">자동타임스탬프</span></td><td>—</td><td>시스템</td><td>상태→검진중 시 자동기록</td></tr>
+    <tr><td>U</td><td>검진시작</td><td>examStart</td><td>DATETIME</td><td><span class="badge b-new">추가</span> <span class="badge b-ts">자동타임스탬프</span></td><td>—</td><td>시스템</td><td>상태→검진중 시 자동기록</td></tr>
+    <tr><td>V</td><td>검진종료</td><td>examEnd</td><td>DATETIME</td><td><span class="badge b-new">추가</span> <span class="badge b-ts">자동타임스탬프</span></td><td>—</td><td>시스템</td><td>상태→검진완료 시 자동기록</td></tr>
+    <tr><td>W</td><td>검진실</td><td>examRoom</td><td>STRING</td><td><span class="badge b-new">추가</span> <span class="badge b-opt">선택</span></td><td>—</td><td>행정</td><td>예: 1검진실, 2검진실</td></tr>
+    <tr><td>X</td><td>문진의사</td><td>doctor</td><td>STRING</td><td><span class="badge b-new">추가</span> <span class="badge b-opt">선택</span></td><td>—</td><td>행정</td><td>담당 문진 의사명</td></tr>
+    <tr><td>Y</td><td>담당간호사</td><td>nurse</td><td>STRING</td><td><span class="badge b-new">추가</span> <span class="badge b-opt">선택</span></td><td>—</td><td>행정</td><td>담당 간호사명</td></tr>
+    <tr><td>Z</td><td>예상비용</td><td>estimatedCost</td><td>NUMBER</td><td><span class="badge b-new">추가</span> <span class="badge b-opt">선택</span></td><td>—</td><td>행정</td><td>원(₩) 단위 정수</td></tr>
+    <tr><td>AA</td><td>결제상태</td><td>paymentStatus</td><td>ENUM</td><td><span class="badge b-new">추가</span> <span class="badge b-auto">자동</span></td><td>미결제</td><td>시스템/행정</td><td>미결제·결제완료·부분결제·환불</td></tr>
+    <tr><td>AB</td><td>결과발송</td><td>resultStatus</td><td>ENUM</td><td><span class="badge b-new">추가</span> <span class="badge b-auto">자동</span></td><td>미발송</td><td>시스템/행정</td><td>미발송·발송완료·미수령·수령확인</td></tr>
+    <tr><td>AC</td><td>재예약여부</td><td>revisit</td><td>ENUM</td><td><span class="badge b-new">추가</span> <span class="badge b-opt">선택</span></td><td>해당없음</td><td>행정</td><td>해당없음·재예약예정·재예약완료</td></tr>
+  </tbody>
+</table>
+
+<!-- ── 운영 팁 ── -->
+<h2>3. Google Sheets 운영 팁</h2>
+<div class="tip-box">
+  <strong>📌 데이터 유효성 검사 설정 권장</strong><br>
+  Google Sheets에서 ENUM 컬럼(F·G·J·M·O·Q·AA·AB·AC)에 데이터 유효성 검사(드롭다운)를 설정하면 입력 오류를 방지할 수 있습니다.<br>
+  <strong>설정 방법:</strong> 해당 열 선택 → 데이터 → 데이터 유효성 검사 → 드롭다운(범위 또는 항목) 설정
+</div>
+<div class="tip-box" style="margin-top:8px;">
+  <strong>🔒 보안 설정 필수</strong><br>
+  • 시트 공유: '제한됨' (특정 계정만 접근)<br>
+  • A열(예약번호), B열(접수일시), P열(예약확정일): 시트 보호 → 편집 잠금 (Apps Script 제외)<br>
+  • 개인정보 컬럼(C·D·E): 운영 관계자 외 접근 차단
+</div>
+<div class="tip-box" style="margin-top:8px;">
+  <strong>📊 자동 대시보드 활용</strong><br>
+  별도 시트를 만들어 COUNTIF·SUMIF·AVERAGEIF 함수로 당일 현황, 주간 실적, 결제 현황을 자동 집계할 수 있습니다.<br>
+  예: <code>=COUNTIFS(O:O,"검진완료",H:H,TODAY())</code> → 오늘 검진완료 건수
+</div>
+
+<p style="margin-top:32px; font-size:12px; color:#999;">
+  CMC Health Screening Platform v1.0 Phase 4.5 | 2026-07-01
+</p>
+</body>
+</html>

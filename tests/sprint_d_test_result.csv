@@ -1,0 +1,37 @@
+﻿테스트명,결과,상세
+GET /api/health,PASS,entities=80건
+인증 없음 → 401,PASS,
+무효 사용자 → 401,PASS,
+GET /api/reservations (직원),PASS,
+목록 개인정보 마스킹,PASS,1999**** / 010-****-0003
+상태 필터,PASS,
+검색(전화 뒷4자리),PASS,
+GET /api/reservations/pending,PASS,
+GET 상세 + allowedNext,PASS,직원=전체 표시
+AI 상세조회 차단 (reservation:view 없음) → 403,PASS,
+상세 개인정보 역할 마스킹 (CRM),PASS,010-****-0002
+POST /api/slots/generate (직원),PASS,20개
+Slot 생성 권한 차단 (AI),PASS,
+GET /api/slots + 날짜 필터,PASS,
+GET /api/slots/recommend (≤5),PASS,5개
+POST /api/reservations (AI 신청),PASS,RSV-20260704-0001
+신청 후 Slot HOLD,PASS,
+AI 승인 차단 → 403,PASS,
+직원 승인 → CONFIRMED,PASS,
+취소 → CANCELLED,PASS,
+취소건 재승인 → 409,PASS,
+중복예약 → 422 + verdict,PASS,
+FULL Slot → 422 + 대체 ≤5,PASS,
+HOLD 해제 (직원),PASS,
+HOLD 해제 권한 차단 (AI),PASS,
+GET /api/admin/schedules?tab=holiday,PASS,
+GET /api/admin/users (민감필드 제외),PASS,
+GET /api/dashboard/kpi (병원장),PASS,"{""pending"": 1, ""confirmed"": 1, ""cancelled"": 1, ""slotUtilization"": 12.0, ""onlineRatio"": 66.7}"
+GET /api/audit-logs 필터 (audit:view),PASS,
+감사로그 대상 검색,PASS,
+동시 신청 처리 (스레드 8),PASS,성공 4건 (중복차단 등 제외)
+예약번호 채번 충돌 없음 (Lock),PASS,"['20260704-0002', '20260704-0003', '20260704-0004', '20260704-0005']"
+동시 쓰기 후 JSON 무결성,PASS,
+전체 데이터 무결성,PASS,"오류 0건, 경고 0건"
+원본 data/ 미변경,PASS,
+GET /api/admin/validate,PASS,

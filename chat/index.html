@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSHSP AI 예약비서 — 위젯 데모</title>
+<link rel="stylesheet" href="chat_widget.css">
+<style>
+  body { font-family: 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6fa; color: #1e293b; }
+  .hero { background: #0f4c81; color: #fff; padding: 40px 24px; }
+  .hero h1 { margin: 0 0 8px; font-size: 24px; }
+  .content { max-width: 760px; margin: 24px auto; padding: 0 16px; line-height: 1.7; font-size: 14px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+  code { background: #eef2f7; padding: 2px 6px; border-radius: 4px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>천안의료원 건강검진센터</h1>
+  <div>예약 페이지 데모 — 우하단 💬 버튼으로 AI 예약비서를 이용해 보세요.</div>
+</div>
+<div class="content">
+  <div class="card">
+    <b>AI 예약비서가 도와드리는 것</b><br>
+    검진 프로그램 안내 · 예약 가능 시간 확인 · 예약 신청(직원 확인 후 확정) · 사전문진 · 상담 접수
+  </div>
+  <div class="card">
+    <b>본인확인 안내</b><br>
+    예약 신청과 내 예약 확인은 본인확인 후 가능합니다. (1단계 이름+전화번호 → 2단계 인증번호)
+    본인확인 전에는 개인정보가 표시되지 않습니다.
+  </div>
+  <div class="card">
+    <b>임베드 방법 (개발자용)</b><br>
+    <code>&lt;link rel="stylesheet" href="/chat/chat_widget.css"&gt;</code><br>
+    <code>&lt;script src="/chat/chat_widget.js"&gt;&lt;/script&gt;</code><br>
+    <code>CSHSPChat.init({ apiBase: 'http://localhost:8600' })</code>
+  </div>
+</div>
+<script src="chat_widget.js"></script>
+<script>
+  CSHSPChat.init({ apiBase: 'http://localhost:8600' });
+</script>
+</body>
+</html>

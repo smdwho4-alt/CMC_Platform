@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>운영 대시보드 v3 | CMC Health Screening Platform</title>
+<link rel="stylesheet" href="../styles/main_style_new.css">
+<link rel="stylesheet" href="../styles/dashboard_style_v2_new.css">
+</head>
+<body>
+
+<!-- ══ 헤더 ════════════════════════════════════════════ -->
+<header class="ops-header">
+  <div class="ops-header-left">
+    <div class="ops-logo">🏥 CMC <span>검진센터 운영</span></div>
+    <div>
+      <span id="clock" class="ops-clock">--:--:--</span>
+      <span id="dateLabel" class="ops-date"></span>
+    </div>
+  </div>
+  <div class="ops-header-right">
+    <span class="ops-badge badge-live">● LIVE</span>
+    <span id="sourceBadge" class="ops-badge badge-mode">Local</span>
+    <span id="refreshLabel" style="font-size:11px;color:var(--text-mute);">자동갱신 <span id="countdown">30</span>s</span>
+    <button class="ops-btn" onclick="DS3.refresh()">🔄 새로고침</button>
+    <nav class="ops-nav">
+      <a href="admin_dashboard_v2_new.html">대시보드 v2</a>
+      <a href="admin_reservations_new.html">예약관리</a>
+      <a href="reservation_new.html">예약신청</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ══ 메인 ════════════════════════════════════════════ -->
+<main class="ops-main">
+
+  <!-- ① KPI 6개 ──────────────────────────────────────── -->
+  <section class="kpi-grid" id="kpiGrid">
+    <!-- JS 렌더링 -->
+  </section>
+
+  <!-- ② 메인 3열 그리드 ──────────────────────────────── -->
+  <div class="ops-grid">
+
+    <!-- 왼쪽: 오늘 일정 -->
+    <div class="ops-card col-schedule">
+      <div class="ops-card-header">
+        <span class="ops-card-title">📆 오늘 일정</span>
+        <span id="scheduleCount" class="ops-card-count">0</span>
+      </div>
+      <div id="scheduleList" class="schedule-list"></div>
+    </div>
+
+    <!-- 가운데: 검사실 현황 + 프로그램 현황 -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- ③ 검사실 운영 현황 -->
+      <div class="ops-card">
+        <div class="ops-card-header">
+          <span class="ops-card-title">🏥 검사실 현황</span>
+          <span style="font-size:11px;color:var(--text-mute);">현재 대기 인원</span>
+        </div>
+        <div id="roomGrid" class="room-grid"></div>
+      </div>
+
+      <!-- ② 프로그램 현황 -->
+      <div class="ops-card">
+        <div class="ops-card-header">
+          <span class="ops-card-title">📊 프로그램 현황</span>
+          <span style="font-size:11px;color:var(--text-mute);">오늘 기준</span>
+        </div>
+        <div id="programList" class="program-list"></div>
+      </div>
+
+    </div>
+
+    <!-- 오른쪽: 사업장 일정 + AI 추천 + 공지사항 -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- ⑤ 사업장 일정 -->
+      <div class="ops-card">
+        <div class="ops-card-header">
+          <span class="ops-card-title">🏢 사업장 일정</span>
+        </div>
+        <div class="tab-row">
+          <button class="tab-btn active" onclick="DS3.switchTab('today',this)">오늘</button>
+          <button class="tab-btn" onclick="DS3.switchTab('tomorrow',this)">내일</button>
+          <button class="tab-btn" onclick="DS3.switchTab('week',this)">이번주</button>
+        </div>
+        <div id="companyList" class="company-list"></div>
+      </div>
+
+      <!-- ⑦ AI 운영 추천 -->
+      <div class="ops-card">
+        <div class="ops-card-header">
+          <span class="ops-card-title">🤖 AI 운영 추천</span>
+          <span style="font-size:10px;color:var(--text-mute);">규칙 기반 분석</span>
+        </div>
+        <div id="aiList" class="ai-list"></div>
+        <div class="ai-footer" id="aiTime"></div>
+      </div>
+
+      <!-- ⑥ 공지사항 -->
+      <div class="ops-card">
+        <div class="ops-card-header">
+          <span class="ops-card-title">📢 공지사항</span>
+          <span id="noticeCount" class="ops-card-count">0</span>
+        </div>
+        <div id="noticeList" class="notice-list"></div>
+        <div class="notice-form">
+          <input id="noticeInput" class="notice-input" type="text"
+            placeholder="공지사항을 입력하세요 (Enter)" maxlength="100"
+            onkeydown="if(event.key==='Enter') DS3.addNotice()">
+          <button class="notice-submit" onclick="DS3.addNotice()">등록</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<!-- ── 자동새로고침 바 ─────────────────────────────────── -->
+<div class="refresh-bar"><div id="refreshFill" class="refresh-bar-fill" style="width:100%"></div></div>
+
+<!-- ══ 스크립트 로드 순서 ════════════════════════════════ -->
+<script src="../data/programs_data_new.js"></script>
+<script src="../data/sample_data_new.js"></script>
+<script src="../services/db_service_new.js"></script>
+<script src="../services/stats_service_new.js"></script>
+<script src="../config_new.js"></script>
+<script src="../services/google_sheets_service_new.js"></script>
+<script src="../services/calendar_service_new.js"></script>
+<script src="../services/gmail_service_new.js"></script>
+<script src="../services/dashboard_service_v2_new.js"></script>
+<script src="../components/nav_new.js"></script>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   DS3 — Dashboard v3 메인 컨트롤러
+══════════════════════════════════════════════════════ */
+const DS3 = {
+
+  _tab: 'today',
+  _countdownVal: 30,
+  _countdownTimer: null,
+  _clockTimer: null,
+
+  /* ── 초기화 ──────────────────────────────────────── */
+  init() {
+    CMC_CONFIG.load();
+    CMC_DB.initSampleIfEmpty();
+
+    this._startClock();
+    this.refresh();
+    this._startCountdown();
+    this._renderSourceBadge();
+  },
+
+  /* ── 전체 새로고침 ────────────────────────────────── */
+  refresh() {
+    this._renderKPI();
+    this._renderSchedule();
+    this._renderRooms();
+    this._renderPrograms();
+    this._renderCompany();
+    this._renderAI();
+    this._renderNotices();
+    this._countdownVal = 30;
+  },
+
+  /* ── KPI ─────────────────────────────────────────── */
+  _renderKPI() {
+    const k = CMC_DashboardV2.todayKPI();
+    const cards = [
+      { label:'오늘 예약', value: k.todayTotal,  icon:'📅', cls:'kpi-blue',   sub:'전체' },
+      { label:'오늘 접수', value: k.checkedIn,   icon:'✅', cls:'kpi-green',  sub:'내원 확인' },
+      { label:'현재 대기', value: k.waiting,     icon:'⏳', cls:'kpi-yellow', sub:'대기 중' },
+      { label:'검진 진행', value: k.inProgress,  icon:'🔄', cls:'kpi-orange', sub:'검진 중' },
+      { label:'검진 완료', value: k.completed,   icon:'🏥', cls:'kpi-purple', sub:'오늘 기준' },
+      { label:'예약 취소', value: k.cancelled,   icon:'❌', cls:'kpi-red',    sub:'오늘 기준' },
+    ];
+    document.getElementById('kpiGrid').innerHTML = cards.map(c => `
+      <div class="kpi-card ${c.cls}">
+        <div class="kpi-icon">${c.icon}</div>
+        <div class="kpi-label">${c.label}</div>
+        <div class="kpi-value">${c.value}</div>
+        <div class="kpi-sub">${c.sub}</div>
+      </div>
+    `).join('');
+  },
+
+  /* ── 오늘 일정 ───────────────────────────────────── */
+  _renderSchedule() {
+    const list  = CMC_DashboardV2.todaySchedule();
+    const el    = document.getElementById('scheduleList');
+    document.getElementById('scheduleCount').textContent = list.length + '건';
+
+    if (list.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text-mute);padding:32px;font-size:12px;">오늘 예약이 없습니다</div>';
+      return;
+    }
+
+    const statusMap = {
+      '예약접수': { dot: 'dot-접수', badge: 's-접수', label: '접수' },
+      '예약확정': { dot: 'dot-확정', badge: 's-확정', label: '확정' },
+      '검진중':   { dot: 'dot-진행', badge: 's-진행', label: '진행중' },
+      '검진완료': { dot: 'dot-완료', badge: 's-완료', label: '완료' },
+      '예약취소': { dot: 'dot-취소', badge: 's-취소', label: '취소' },
+      '일정변경': { dot: 'dot-변경', badge: 's-변경', label: '변경' },
+    };
+
+    el.innerHTML = list.map(r => {
+      const s   = statusMap[r.status] || statusMap['예약접수'];
+      const prog = r.program || '';
+      const room = r.examRoom ? `· ${r.examRoom}` : '';
+      const company = r.company ? ` · ${r.company}` : '';
+      return `
+        <div class="schedule-item">
+          <div class="sch-time">${r.wishTime || '--:--'}</div>
+          <div class="sch-info">
+            <div class="sch-name">
+              <span class="status-dot ${s.dot}"></span>${CMC.esc(r.name)}
+            </div>
+            <div class="sch-detail">${CMC.esc(prog)}${CMC.esc(company)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+            <span class="s-badge ${s.badge}">${s.label}</span>
+            ${room ? `<span class="sch-room">${CMC.esc(r.examRoom)}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  /* ── 검사실 현황 ─────────────────────────────────── */
+  _renderRooms() {
+    const rooms = CMC_DashboardV2.examRoomStatus();
+    document.getElementById('roomGrid').innerHTML = rooms.map(r => {
+      const busy  = r.waiting >= 3;
+      const clear = r.waiting === 0;
+      const cls   = busy ? 'room-busy' : (clear ? 'room-clear' : '');
+      const vcls  = busy ? '' : (clear ? '' : 'room-count-normal');
+      return `
+        <div class="room-card ${cls}">
+          <div class="room-icon">${r.icon}</div>
+          <div class="room-name">${r.id}</div>
+          <div class="room-count ${vcls}">${r.waiting}</div>
+          <div class="room-label">대기</div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  /* ── 프로그램 현황 ───────────────────────────────── */
+  _renderPrograms() {
+    const stats = CMC_DashboardV2.programStats();
+    const max   = Math.max(...stats.map(s => s.count), 1);
+    document.getElementById('programList').innerHTML = stats.map(s => `
+      <div class="prog-row">
+        <span class="prog-icon">${s.icon}</span>
+        <span class="prog-name">${s.name}</span>
+        <div class="prog-bar-wrap">
+          <div class="prog-bar" style="width:${s.count/max*100}%;background:${s.color}"></div>
+        </div>
+        <span class="prog-count" style="color:${s.color}">${s.count}</span>
+      </div>
+    `).join('');
+  },
+
+  /* ── 사업장 일정 ─────────────────────────────────── */
+  switchTab(range, btn) {
+    this._tab = range;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    this._renderCompany();
+  },
+
+  _renderCompany() {
+    const list = CMC_DashboardV2.companySchedule(this._tab);
+    const el   = document.getElementById('companyList');
+    if (list.length === 0) {
+      el.innerHTML = '<div class="co-empty">사업장 일정이 없습니다</div>';
+      return;
+    }
+    el.innerHTML = list.map(c => `
+      <div class="company-item">
+        <span class="co-date">${c.date.slice(5)}</span>
+        <span class="co-name">🏢 ${CMC.esc(c.company)}</span>
+        <span class="co-count">${c.count}명</span>
+      </div>
+    `).join('');
+  },
+
+  /* ── AI 추천 ─────────────────────────────────────── */
+  _renderAI() {
+    const list = CMC_DashboardV2.getAIRecommendations();
+    const priLabel = { high: '긴급', mid: '주의', low: '참고' };
+    document.getElementById('aiList').innerHTML = list.map(r => `
+      <div class="ai-item">
+        <span class="ai-bullet">${r.icon}</span>
+        <span class="ai-text">${CMC.esc(r.text)}</span>
+        <span class="ai-priority pri-${r.priority}">${priLabel[r.priority]}</span>
+      </div>
+    `).join('');
+    const now = new Date();
+    document.getElementById('aiTime').textContent =
+      `분석 기준: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')} — 실제 AI 모델 연동 시 정확도 향상`;
+  },
+
+  /* ── 공지사항 ────────────────────────────────────── */
+  _renderNotices() {
+    const list = CMC_DashboardV2.getNotices();
+    const el   = document.getElementById('noticeList');
+    document.getElementById('noticeCount').textContent = list.length;
+
+    if (list.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text-mute);padding:12px;font-size:12px;">공지사항이 없습니다</div>';
+      return;
+    }
+    el.innerHTML = list.map(n => `
+      <div class="notice-item">
+        <span class="notice-date">${n.date}</span>
+        <span class="notice-text">${CMC.esc(n.text)}</span>
+        <button class="notice-del" onclick="DS3.deleteNotice(${n.id})" title="삭제">✕</button>
+      </div>
+    `).join('');
+  },
+
+  addNotice() {
+    const input = document.getElementById('noticeInput');
+    CMC_DashboardV2.addNotice(input.value);
+    input.value = '';
+    this._renderNotices();
+  },
+
+  deleteNotice(id) {
+    CMC_DashboardV2.deleteNotice(id);
+    this._renderNotices();
+  },
+
+  /* ── 실시간 시계 ─────────────────────────────────── */
+  _startClock() {
+    const tick = () => {
+      const now  = new Date();
+      const hh   = String(now.getHours()).padStart(2, '0');
+      const mm   = String(now.getMinutes()).padStart(2, '0');
+      const ss   = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('clock').textContent = `${hh}:${mm}:${ss}`;
+      document.getElementById('dateLabel').textContent =
+        now.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+    };
+    tick();
+    this._clockTimer = setInterval(tick, 1000);
+  },
+
+  /* ── 자동 새로고침 카운트다운 ────────────────────── */
+  _startCountdown() {
+    const fill = document.getElementById('refreshFill');
+    const cnt  = document.getElementById('countdown');
+    this._countdownTimer = setInterval(() => {
+      this._countdownVal--;
+      if (cnt) cnt.textContent = this._countdownVal;
+      const pct = (this._countdownVal / 30) * 100;
+      if (fill) fill.style.width = pct + '%';
+      if (this._countdownVal <= 0) {
+        this._countdownVal = 30;
+        this.refresh();
+      }
+    }, 1000);
+  },
+
+  /* ── 데이터 소스 배지 ────────────────────────────── */
+  _renderSourceBadge() {
+    const badge = document.getElementById('sourceBadge');
+    if (badge) badge.textContent = CMC_CONFIG.isGoogle() ? 'Google WS' : 'Local';
+  },
+};
+
+/* 페이지 로드 후 초기화 */
+document.addEventListener('DOMContentLoaded', () => DS3.init());
+</script>
+</body>
+</html>

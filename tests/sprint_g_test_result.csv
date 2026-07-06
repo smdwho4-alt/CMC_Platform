@@ -1,0 +1,31 @@
+﻿테스트명,결과,상세
+API Key 없음 → Mock 모드,PASS,mode=mock
+Mock 응답 정상,PASS,
+timeout 2회 후 retry 성공,PASS,시도 3회
+재시도 소진 시 예외,PASS,
+허용 Tool 실행 (list_available_slots),PASS,"[{'name': 'list_available_slots', 'blocked': False, 'ok': True}]"
+tool_result가 단일 user 메시지로 반환,PASS,1개 메시지
+미허용 Tool 차단 (approve_reservation),PASS,"[{'name': 'approve_reservation', 'blocked': True}]"
+차단 후 예약 상태 불변,PASS,
+슬롯 추출 (이름/전화/프로그램/일시),PASS,"{'name': '테스트박', 'phone': '010-0000-0003', 'programId': 'PRG-SMART', 'date': '2026-07-21', 'time': '09:00'}"
+추출 실패 시 missing 목록,PASS,
+Prompt Injection 차단,PASS,
+본인확인 전 개인정보 비노출,PASS,
+본인확인 2단계 완료,PASS,
+자연어 예약 신청 (추출→엔진),PASS,RSV-20260704-0001
+정보 부족 시 필요한 항목만 질문,PASS,"예약 신청을 위해 검진 프로그램, 희망 날짜, 희망 시간을(를) 알려주세요."
+의료질문 차단 (전화번호 포함),PASS,
+감사기록 개인정보 마스킹,PASS,
+상담원 연결 (CRM),PASS,
+문진 제출 (세션 검증),PASS,
+세션 재시작 후 복구,PASS,새 앱 인스턴스에서 VERIFIED_PHONE
+AI Metrics: 총 상담/전환/차단,PASS,"chats=5, conv=1, blocks=1"
+AI Metrics: 본인확인/문진/상담원,PASS,
+AI Metrics: 시간대별 상담량,PASS,
+Safety 차단 통계 (유형별),PASS,{'RESULT_INTERPRETATION': 1}
+Safety 차단 이력 API,PASS,
+Rate Limit 초과 → 429,PASS,11번째 요청 = 429
+Rate Limit 이벤트 집계,PASS,
+mask_pii (전화/주민/이메일),PASS,문의: 010-****-5432 / ******-******* / qa***@example.com
+전체 데이터 무결성,PASS,오류 0건
+원본 data/ 미변경 (sessions/ai_events 미생성),PASS,

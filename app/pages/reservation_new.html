@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>예약신청 | CMC Health Screening Platform</title>
+  <link rel="stylesheet" href="../styles/main_style_new.css">
+</head>
+<body>
+
+<main class="page-wrap" style="margin-top:0;padding-top:22px;max-width:800px">
+
+  <div class="page-header">
+    <div class="page-title">📋 종합건강검진 예약신청</div>
+    <div class="page-date">온라인 접수 후 담당자가 1~2 영업일 내 연락드립니다</div>
+  </div>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">ℹ️</span>
+    <div>문의: <strong>041-570-7777</strong> (검진센터 직통) | 평일 08:00~17:00</div>
+  </div>
+
+  <div id="formWrap">
+    <form id="reservationForm" novalidate>
+
+      <!-- STEP 1 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">1</span><h2>기본 정보</h2></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group"><label>성명 <span class="required">*</span></label><input type="text" id="name" placeholder="홍길동" maxlength="20" autocomplete="name"></div>
+            <div class="form-group"><label>생년월일 <span class="required">*</span></label><input type="date" id="birth" min="1920-01-01" max="2020-12-31"></div>
+            <div class="form-group"><label>연락처 <span class="required">*</span></label><input type="tel" id="phone" placeholder="010-0000-0000" maxlength="13" autocomplete="tel"></div>
+            <div class="form-group">
+              <label>성별 <span class="required">*</span></label>
+              <div class="radio-group" id="genderGroup">
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>남성</span></label>
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>여성</span></label>
+              </div>
+            </div>
+            <div class="form-group"><label>사업장명</label><input type="text" id="company" placeholder="회사명 또는 기관명" maxlength="50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">2</span><h2>검진 프로그램 <span class="required">*</span></h2></div>
+        <div class="card-body">
+          <div class="alert alert-info" style="margin-bottom:14px"><span class="alert-icon">💡</span><div>3.0T MRI 포함 정밀 검진: <strong>VIP·PREMIUM</strong></div></div>
+          <div class="program-grid" id="programGrid"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">3</span><h2>희망 일정</h2></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group"><label>희망 검진일 <span class="required">*</span></label><input type="date" id="wishDate"></div>
+            <div class="form-group">
+              <label>수면 검진</label>
+              <div class="radio-group" id="sleepGroup">
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>일반</span></label>
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>💤 수면</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:16px">
+            <label>희망 시간 <span class="required">*</span></label>
+            <div class="radio-group" id="timeSlots" style="margin-top:6px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">4</span><h2>선택 검사</h2></div>
+        <div class="card-body">
+          <div class="alert alert-warning" style="margin-bottom:12px"><span class="alert-icon">⚠️</span><div>선택검사 비용은 별도 안내드립니다.</div></div>
+          <div class="optional-grid" id="optionalGrid"></div>
+        </div>
+      </div>
+
+      <!-- STEP 5 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">5</span><h2>특이사항 및 동의</h2></div>
+        <div class="card-body">
+          <div class="form-group" style="margin-bottom:18px">
+            <label>특이사항 (알레르기·복용약·과거력 등)</label>
+            <textarea id="note" placeholder="의료진이 알아야 할 사항을 입력해 주세요."></textarea>
+          </div>
+          <div class="privacy-box">
+            <h4>개인정보 수집·이용 동의</h4>
+            <p><strong>수집항목:</strong> 성명, 생년월일, 연락처, 성별, 사업장명, 검진 관련 정보</p>
+            <p><strong>목적:</strong> 검진 예약 접수, 일정 안내, 결과 통보</p>
+            <p><strong>보유기간:</strong> 검진 완료 후 5년 (의료법 제22조)</p>
+            <p style="color:#c62828;margin-top:6px">※ v1.0 시제품 — 실제 운영 시 보안 서버 전환 필요</p>
+          </div>
+          <label class="privacy-agree"><input type="checkbox" id="privacyAgree"> 개인정보 수집·이용에 동의합니다 <span class="required">*</span></label>
+        </div>
+      </div>
+
+      <div style="text-align:center">
+        <button type="submit" class="btn btn-primary btn-lg" style="max-width:420px">📋 예약 신청하기</button>
+        <p style="margin-top:10px;font-size:13px;color:var(--gray-500)">신청 후 1~2 영업일 내 연락드립니다</p>
+      </div>
+    </form>
+  </div>
+
+  <!-- 완료 화면 -->
+  <div id="successScreen" style="display:none">
+    <div class="card"><div class="card-body success-screen">
+      <div class="success-icon">✅</div>
+      <div class="success-title">예약 신청 완료!</div>
+      <div class="success-sub">담당자가 <strong>1~2 영업일 내</strong> 연락드립니다.</div>
+      <div class="reservation-number-box">
+        <div class="label">예약번호</div>
+        <div class="number" id="successNo">-</div>
+      </div>
+      <div style="margin-bottom:22px;background:var(--gray-50);border-radius:8px;padding:14px 20px;text-align:left;display:inline-block">
+        <table style="font-size:15px;border-collapse:collapse">
+          <tr><td style="color:var(--gray-500);padding:4px 8px;width:80px">신청자</td><td id="successName" style="font-weight:700;padding:4px 8px"></td></tr>
+          <tr><td style="color:var(--gray-500);padding:4px 8px">검진일시</td><td id="successDate" style="font-weight:700;padding:4px 8px"></td></tr>
+          <tr><td style="color:var(--gray-500);padding:4px 8px">프로그램</td><td id="successProg" style="font-weight:700;padding:4px 8px"></td></tr>
+        </table>
+      </div>
+      <div class="btn-group center">
+        <button class="btn btn-outline" onclick="location.reload()">새 예약 신청</button>
+        <a href="admin_dashboard_new.html" class="btn btn-secondary">대시보드</a>
+      </div>
+    </div></div>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <strong>천안의료원 건강검진센터</strong><br>
+  <span style="font-size:12px;opacity:.6">CMC Health Screening Platform v1.0 | 041-570-7777</span>
+</footer>
+
+<script src="../data/programs_data_new.js"></script>
+<script src="../data/sample_data_new.js"></script>
+<script src="../services/db_service_new.js"></script>
+<script src="../services/stats_service_new.js"></script>
+<script src="../components/nav_new.js"></script>
+<script>
+'use strict';
+const RF = {
+  selectedProg: null, selectedTests: new Set(),
+
+  init() {
+    CMC_DB.initSampleIfEmpty();
+    CMC_Nav.render('reservation');
+    this.renderProgs(); this.renderTests(); this.renderTimes(); this.bindEvents();
+    const d = new Date(); d.setDate(d.getDate()+1);
+    document.getElementById('wishDate').min = d.toISOString().split('T')[0];
+  },
+
+  renderProgs() {
+    const badgeMap = { BASIC:'badge-basic', SMART:'badge-smart', VIP:'badge-vip', PREMIUM:'badge-premium', YOUNG:'badge-young', '온김에검진':'badge-on' };
+    document.getElementById('programGrid').innerHTML = CMC.PROGRAMS.map(p =>
+      `<div class="program-card" data-id="${p.id}" onclick="RF.selectProg('${p.id}')">
+         <span class="program-badge ${badgeMap[p.id]||''}">${p.id}</span>
+         <div class="program-name">${p.name}</div>
+         <div class="program-price">${p.price}</div>
+         <div class="program-desc">${p.desc}</div>
+       </div>`).join('');
+  },
+  selectProg(id) {
+    this.selectedProg = id;
+    document.querySelectorAll('.program-card').forEach(e => e.classList.toggle('selected', e.dataset.id === id));
+  },
+
+  renderTests() {
+    document.getElementById('optionalGrid').innerHTML = CMC.OPTIONAL_TESTS.map(t =>
+      `<div class="optional-item" data-t="${CMC.esc(t)}" onclick="RF.toggleTest('${CMC.esc(t)}')">
+         <span class="optional-check"></span><span>${t}</span></div>`).join('');
+  },
+  toggleTest(n) {
+    this.selectedTests.has(n) ? this.selectedTests.delete(n) : this.selectedTests.add(n);
+    document.querySelectorAll('.optional-item').forEach(e => e.classList.toggle('selected', this.selectedTests.has(e.dataset.t)));
+  },
+
+  renderTimes() {
+    document.getElementById('timeSlots').innerHTML = CMC.TIME_SLOTS.map(t =>
+      `<div class="radio-item" data-t="${t}" onclick="RF.selectTime('${t}')">
+         <span class="radio-dot"></span><span>${t}</span></div>`).join('');
+  },
+  selectTime(t) {
+    document.querySelectorAll('#timeSlots .radio-item').forEach(e => e.classList.toggle('selected', e.dataset.t === t));
+  },
+
+  bindEvents() {
+    ['genderGroup','sleepGroup'].forEach(gid => {
+      document.querySelectorAll(`#${gid} .radio-item`).forEach(el =>
+        el.addEventListener('click', () => {
+          document.querySelectorAll(`#${gid} .radio-item`).forEach(e => e.classList.remove('selected'));
+          el.classList.add('selected');
+        }));
+    });
+    document.getElementById('reservationForm').addEventListener('submit', e => { e.preventDefault(); this.submit(); });
+  },
+
+  getField(id) { return (document.getElementById(id)?.value||'').trim(); },
+  getRadio(gid) { return document.querySelector(`#${gid} .radio-item.selected span:last-child`)?.textContent.trim() || ''; },
+  getTime()     { return document.querySelector('#timeSlots .radio-item.selected')?.dataset.t || ''; },
+
+  validate() {
+    const e = [];
+    if (!this.getField('name'))     e.push('성명을 입력해 주세요.');
+    if (!this.getField('birth'))    e.push('생년월일을 선택해 주세요.');
+    if (!this.getField('phone'))    e.push('연락처를 입력해 주세요.');
+    if (!this.getRadio('genderGroup')) e.push('성별을 선택해 주세요.');
+    if (!this.selectedProg)         e.push('검진 프로그램을 선택해 주세요.');
+    if (!this.getField('wishDate')) e.push('희망 검진일을 선택해 주세요.');
+    if (!this.getTime())            e.push('희망 시간을 선택해 주세요.');
+    if (!document.getElementById('privacyAgree').checked) e.push('개인정보 동의가 필요합니다.');
+    return e;
+  },
+
+  submit() {
+    const errors = this.validate();
+    if (errors.length) { alert('입력 확인\n\n' + errors.join('\n')); return; }
+    const r = {
+      reservationNo: CMC_DB.generateNo(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      status: '예약접수', name: this.getField('name'), birth: this.getField('birth'),
+      phone: this.getField('phone'), gender: this.getRadio('genderGroup'),
+      program: this.selectedProg, wishDate: this.getField('wishDate'), wishTime: this.getTime(),
+      sleep: this.getRadio('sleepGroup') || '일반', optionalTests: [...this.selectedTests],
+      company: this.getField('company'), note: this.getField('note'),
+    };
+    CMC_DB.add(r);
+    document.getElementById('formWrap').style.display = 'none';
+    document.getElementById('successScreen').style.display = 'block';
+    document.getElementById('successNo').textContent   = r.reservationNo;
+    document.getElementById('successName').textContent = r.name;
+    document.getElementById('successDate').textContent = `${r.wishDate} (${r.wishTime})`;
+    document.getElementById('successProg').textContent = r.program;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+};
+document.addEventListener('DOMContentLoaded', () => RF.init());
+</script>
+</body>
+</html>

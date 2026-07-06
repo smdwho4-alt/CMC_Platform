@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ERD — CMC 건강검진 예약 DB Schema</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', sans-serif; background: #f5f7fa; color: #222; padding: 24px; }
+  h1  { font-size: 20px; color: #1a4f8a; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .layout { display: flex; gap: 24px; flex-wrap: wrap; }
+  .table-card {
+    background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.10);
+    overflow: hidden; min-width: 340px; flex: 1;
+  }
+  .table-header {
+    padding: 12px 16px; font-weight: 700; font-size: 15px; color: #fff;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .th-blue  { background: #1a4f8a; }
+  .th-green { background: #2e7d32; }
+  .th-grey  { background: #546e7a; }
+  .col-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .col-table th { background: #f0f4ff; color: #1a4f8a; padding: 6px 12px; text-align: left; font-size: 12px; }
+  .col-table td { padding: 5px 12px; border-bottom: 1px solid #f0f0f0; }
+  .col-table tr:last-child td { border-bottom: none; }
+  .col-table tr:hover td { background: #f8f9ff; }
+  .badge {
+    display: inline-block; padding: 1px 7px; border-radius: 4px;
+    font-size: 11px; font-weight: 700;
+  }
+  .badge-pk   { background: #fff3cd; color: #856404; }
+  .badge-req  { background: #fde8e8; color: #c62828; }
+  .badge-auto { background: #e8f5e9; color: #2e7d32; }
+  .badge-opt  { background: #f3f3f3; color: #555; }
+  .badge-enum { background: #e8f0fe; color: #1a4f8a; }
+  .type-badge { background: #f0f0f0; color: #555; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-family: monospace; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0 6px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+  .phase-tag { font-size: 11px; color: #888; }
+  .enum-box { background: #f8f9ff; border: 1px solid #c8d8f0; border-radius: 6px; padding: 10px 16px; margin: 8px 0; font-size: 12px; }
+  .enum-box strong { color: #1a4f8a; }
+  .enum-values { color: #333; margin-top: 4px; }
+  h2 { font-size: 15px; color: #1a4f8a; margin: 24px 0 10px; }
+</style>
+</head>
+<body>
+
+<h1>📋 ERD — CMC 건강검진 예약 DB Schema</h1>
+<p class="subtitle">CMC Health Screening Platform v1.0 Phase 4.5 | 천안의료원 건강검진센터 | 2026-07-01</p>
+
+<div class="legend">
+  <div class="legend-item"><span class="badge badge-pk">PK</span> 기본키</div>
+  <div class="legend-item"><span class="badge badge-req">필수</span> 필수값</div>
+  <div class="legend-item"><span class="badge badge-auto">자동</span> 자동입력</div>
+  <div class="legend-item"><span class="badge badge-enum">ENUM</span> 허용값 제한</div>
+  <div class="legend-item"><span class="badge badge-opt">선택</span> 선택값</div>
+</div>
+
+<div class="layout">
+
+  <!-- 예약 정보 컬럼 -->
+  <div class="table-card">
+    <div class="table-header th-blue">📅 예약현황 — 예약 정보 <span class="phase-tag">Phase 4 기존 18개</span></div>
+    <table class="col-table">
+      <thead><tr><th>#</th><th>컬럼명</th><th>영문 필드</th><th>타입</th><th>속성</th><th>기본값/설명</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>예약번호</td><td>reservationNo</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-pk">PK</span> <span class="badge badge-auto">자동</span></td><td>YYYYMMDD-NNNN</td></tr>
+        <tr><td>2</td><td>접수일시</td><td>createdAt</td><td><span class="type-badge">DATETIME</span></td><td><span class="badge badge-auto">자동</span></td><td>등록 시 서버 타임스탬프</td></tr>
+        <tr><td>3</td><td>성명</td><td>name</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-req">필수</span></td><td>수검자 성명</td></tr>
+        <tr><td>4</td><td>생년월일</td><td>birth</td><td><span class="type-badge">DATE</span></td><td><span class="badge badge-req">필수</span></td><td>YYYY-MM-DD</td></tr>
+        <tr><td>5</td><td>연락처</td><td>phone</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-req">필수</span></td><td>010-XXXX-XXXX</td></tr>
+        <tr><td>6</td><td>성별</td><td>gender</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-req">필수</span> <span class="badge badge-enum">ENUM</span></td><td>남 / 여</td></tr>
+        <tr><td>7</td><td>검진프로그램</td><td>program</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-req">필수</span> <span class="badge badge-enum">ENUM</span></td><td>BASIC·SMART·VIP·PREMIUM·YOUNG·온김에</td></tr>
+        <tr><td>8</td><td>희망검진일</td><td>wishDate</td><td><span class="type-badge">DATE</span></td><td><span class="badge badge-req">필수</span></td><td>YYYY-MM-DD</td></tr>
+        <tr><td>9</td><td>희망시간</td><td>wishTime</td><td><span class="type-badge">TIME</span></td><td><span class="badge badge-req">필수</span></td><td>HH:mm</td></tr>
+        <tr><td>10</td><td>수면</td><td>sleep</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-opt">선택</span> <span class="badge badge-enum">ENUM</span></td><td>수면선택 / 미선택</td></tr>
+        <tr><td>11</td><td>선택검사</td><td>optionalTests</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-opt">선택</span></td><td>콤마 구분 복수값</td></tr>
+        <tr><td>12</td><td>사업장</td><td>company</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-opt">선택</span></td><td>사업장 출장검진 시</td></tr>
+        <tr><td>13</td><td>예약경로</td><td>route</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-opt">선택</span> <span class="badge badge-enum">ENUM</span></td><td>온라인 / 전화 / 방문 / 협약</td></tr>
+        <tr><td>14</td><td>담당자</td><td>manager</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-opt">선택</span></td><td>예약 처리 직원명</td></tr>
+        <tr><td>15</td><td>예약상태</td><td>status</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-req">필수</span> <span class="badge badge-enum">ENUM</span></td><td>예약접수→확정→검진중→완료·취소·변경</td></tr>
+        <tr><td>16</td><td>예약확정일</td><td>confirmedAt</td><td><span class="type-badge">DATETIME</span></td><td><span class="badge badge-auto">자동</span></td><td>확정 처리 시 자동 기록</td></tr>
+        <tr><td>17</td><td>문자발송</td><td>smsSent</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-auto">자동</span></td><td>Y / N</td></tr>
+        <tr><td>18</td><td>특이사항</td><td>note</td><td><span class="type-badge">TEXT</span></td><td><span class="badge badge-opt">선택</span></td><td>자유 메모</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 운영 정보 컬럼 -->
+  <div class="table-card">
+    <div class="table-header th-green">🏥 예약현황 — 운영 정보 <span class="phase-tag">Phase 4.5 추가 11개</span></div>
+    <table class="col-table">
+      <thead><tr><th>#</th><th>컬럼명</th><th>영문 필드</th><th>타입</th><th>속성</th><th>기본값/설명</th></tr></thead>
+      <tbody>
+        <tr><td>19</td><td>검진예정시간</td><td>scheduledTime</td><td><span class="type-badge">TIME</span></td><td><span class="badge badge-opt">선택</span></td><td>실제 배정된 검진 시간 (HH:mm)</td></tr>
+        <tr><td>20</td><td>접수시간</td><td>checkinTime</td><td><span class="type-badge">DATETIME</span></td><td><span class="badge badge-auto">자동</span></td><td>검진센터 내원 접수 시각</td></tr>
+        <tr><td>21</td><td>검진시작</td><td>examStart</td><td><span class="type-badge">DATETIME</span></td><td><span class="badge badge-auto">자동</span></td><td>실제 검진 시작 시각</td></tr>
+        <tr><td>22</td><td>검진종료</td><td>examEnd</td><td><span class="type-badge">DATETIME</span></td><td><span class="badge badge-auto">자동</span></td><td>검진 완료 시각</td></tr>
+        <tr><td>23</td><td>검진실</td><td>examRoom</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-opt">선택</span></td><td>배정 검진실명 (예: 1검진실)</td></tr>
+        <tr><td>24</td><td>문진의사</td><td>doctor</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-opt">선택</span></td><td>담당 문진 의사명</td></tr>
+        <tr><td>25</td><td>담당간호사</td><td>nurse</td><td><span class="type-badge">STRING</span></td><td><span class="badge badge-opt">선택</span></td><td>담당 간호사명</td></tr>
+        <tr><td>26</td><td>예상비용</td><td>estimatedCost</td><td><span class="type-badge">NUMBER</span></td><td><span class="badge badge-opt">선택</span></td><td>원(₩) 단위 정수</td></tr>
+        <tr><td>27</td><td>결제상태</td><td>paymentStatus</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-auto">자동</span> <span class="badge badge-enum">ENUM</span></td><td>미결제(기본) / 결제완료 / 부분결제 / 환불</td></tr>
+        <tr><td>28</td><td>결과발송</td><td>resultStatus</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-auto">자동</span> <span class="badge badge-enum">ENUM</span></td><td>미발송(기본) / 발송완료 / 미수령 / 수령확인</td></tr>
+        <tr><td>29</td><td>재예약여부</td><td>revisit</td><td><span class="type-badge">ENUM</span></td><td><span class="badge badge-opt">선택</span> <span class="badge badge-enum">ENUM</span></td><td>해당없음(기본) / 재예약예정 / 재예약완료</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<h2>🔢 ENUM 허용값 정의</h2>
+<div style="display:flex; gap:16px; flex-wrap:wrap;">
+  <div class="enum-box">
+    <strong>예약상태</strong>
+    <div class="enum-values">예약접수 → 예약확정 → 검진중 → 검진완료<br>일정변경 / 예약취소</div>
+  </div>
+  <div class="enum-box">
+    <strong>결제상태</strong>
+    <div class="enum-values">미결제 / 결제완료 / 부분결제 / 환불</div>
+  </div>
+  <div class="enum-box">
+    <strong>결과발송</strong>
+    <div class="enum-values">미발송 / 발송완료 / 미수령 / 수령확인</div>
+  </div>
+  <div class="enum-box">
+    <strong>재예약여부</strong>
+    <div class="enum-values">해당없음 / 재예약예정 / 재예약완료</div>
+  </div>
+  <div class="enum-box">
+    <strong>성별</strong>
+    <div class="enum-values">남 / 여</div>
+  </div>
+  <div class="enum-box">
+    <strong>예약경로</strong>
+    <div class="enum-values">온라인 / 전화 / 방문 / 협약</div>
+  </div>
+</div>
+
+<p style="margin-top:32px; font-size:12px; color:#999;">
+  CMC Health Screening Platform v1.0 Phase 4.5 | Google Sheets 단일 테이블 구조 | 2026-07-01
+</p>
+
+</body>
+</html>

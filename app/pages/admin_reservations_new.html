@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>예약관리 | CMC Health Screening Platform</title>
+  <link rel="stylesheet" href="../styles/main_style_new.css">
+  <style>
+    .admin-warn { background:#fff; border-bottom:1px solid var(--border); padding:10px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+    .admin-badge { background:var(--danger); color:#fff; font-size:12px; font-weight:700; padding:3px 10px; border-radius:20px; }
+    .stats-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px; }
+    .stat-c { background:#fff; border-radius:var(--radius); padding:14px; text-align:center; border:1px solid var(--border); box-shadow:var(--shadow-sm); }
+    .stat-c .sv { font-size:28px; font-weight:800; color:var(--primary); }
+    .stat-c .sl { font-size:13px; color:var(--gray-500); margin-bottom:4px; }
+    .stat-c.s-확정 .sv { color:var(--secondary); }
+    .stat-c.s-취소  .sv { color:var(--danger); }
+    .stat-c.s-완료  .sv { color:#4527a0; }
+    .stat-c.s-변경  .sv { color:var(--warning); }
+    @media(max-width:700px){ .stats-row{grid-template-columns:repeat(3,1fr)} }
+    @media(max-width:460px){ .stats-row{grid-template-columns:repeat(2,1fr)} }
+  </style>
+</head>
+<body>
+
+<div class="admin-warn">
+  <div style="display:flex;align-items:center;gap:9px">
+    <span class="admin-badge">🔒 관리자 전용</span>
+    <span style="font-size:13px;color:var(--gray-500)">실제 운영 전 로그인 인증 필요</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:9px">
+    <span id="clock" style="font-size:13px;color:var(--gray-500)"></span>
+    <button class="btn btn-outline btn-sm" onclick="AA.downloadCSV()">⬇ CSV</button>
+    <a href="admin_dashboard_new.html" class="btn btn-primary btn-sm">📊 대시보드</a>
+  </div>
+</div>
+
+<main class="page-wrap" style="margin-top:0;padding-top:18px">
+
+  <div class="page-header" style="margin-bottom:16px">
+    <div class="page-title">📁 예약관리</div>
+  </div>
+
+  <!-- 통계 -->
+  <div class="stats-row">
+    <div class="stat-c"><div class="sl">전체</div><div class="sv" id="st-total">0</div></div>
+    <div class="stat-c"><div class="sl">예약접수</div><div class="sv" id="st-접수">0</div></div>
+    <div class="stat-c s-확정"><div class="sl">예약확정</div><div class="sv" id="st-확정">0</div></div>
+    <div class="stat-c s-완료"><div class="sl">검진완료</div><div class="sv" id="st-완료">0</div></div>
+    <div class="stat-c s-취소"><div class="sl">취소·변경</div><div class="sv" id="st-취소변경">0</div></div>
+  </div>
+
+  <!-- 필터 -->
+  <div class="filter-bar">
+    <div class="filter-group filter-search" style="flex:2">
+      <label>🔍 통합 검색</label>
+      <input type="text" id="searchInput" placeholder="성명 · 연락처 · 예약번호 · 사업장">
+    </div>
+    <div class="filter-group">
+      <label>상태</label>
+      <select id="fStatus">
+        <option value="">전체</option>
+        <option>예약접수</option><option>예약확정</option><option>검진완료</option><option>일정변경</option><option>예약취소</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>프로그램</label>
+      <select id="fProg">
+        <option value="">전체</option>
+        <option>BASIC</option><option>SMART</option><option>VIP</option><option>PREMIUM</option><option>YOUNG</option><option>온김에검진</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>검진일(시작)</label>
+      <input type="date" id="fDateFrom">
+    </div>
+    <div class="filter-group">
+      <label>검진일(종료)</label>
+      <input type="date" id="fDateTo">
+    </div>
+    <div style="align-self:flex-end">
+      <button class="btn btn-secondary btn-sm" onclick="AA.clearFilters()">초기화</button>
+    </div>
+  </div>
+
+  <!-- 테이블 -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>예약번호</th><th>접수일시</th><th>성명</th><th>연락처</th>
+          <th>프로그램</th><th>희망검진일시</th><th>수면</th><th>상태</th><th>관리</th>
+        </tr>
+      </thead>
+      <tbody id="mainTable"></tbody>
+    </table>
+  </div>
+  <div id="pagination"></div>
+
+</main>
+
+<!-- 상세 모달 -->
+<div id="detailModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)AA.closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>예약 상세</h3>
+      <button class="modal-close" onclick="AA.closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:12px;color:var(--gray-500)">예약번호</div>
+          <div id="mNo" style="font-size:18px;font-weight:700;font-family:monospace;color:var(--primary)"></div>
+        </div>
+        <span id="mStatus" class="status-badge"></span>
+      </div>
+      <hr class="detail-divider">
+      <div class="detail-grid">
+        <div class="detail-row"><span class="detail-label">성명</span><span class="detail-value" id="dName"></span></div>
+        <div class="detail-row"><span class="detail-label">생년월일</span><span class="detail-value" id="dBirth"></span></div>
+        <div class="detail-row"><span class="detail-label">연락처</span><span class="detail-value" id="dPhone"></span></div>
+        <div class="detail-row"><span class="detail-label">성별</span><span class="detail-value" id="dGender"></span></div>
+        <div class="detail-row"><span class="detail-label">프로그램</span><span class="detail-value" id="dProg"></span></div>
+        <div class="detail-row"><span class="detail-label">희망일시</span><span class="detail-value" id="dDate"></span></div>
+        <div class="detail-row"><span class="detail-label">수면</span><span class="detail-value" id="dSleep"></span></div>
+        <div class="detail-row"><span class="detail-label">사업장</span><span class="detail-value" id="dCompany"></span></div>
+        <div class="detail-row full"><span class="detail-label">선택검사</span><span class="detail-value" id="dTests"></span></div>
+        <div class="detail-row full"><span class="detail-label">특이사항</span><span class="detail-value" id="dNote" style="white-space:pre-wrap"></span></div>
+      </div>
+      <hr class="detail-divider">
+      <div class="detail-grid">
+        <div class="detail-row"><span class="detail-label">접수일시</span><span class="detail-value" id="dCreated" style="font-size:13px;color:var(--gray-500)"></span></div>
+        <div class="detail-row"><span class="detail-label">최종수정</span><span class="detail-value" id="dUpdated" style="font-size:13px;color:var(--gray-500)"></span></div>
+      </div>
+      <hr class="detail-divider">
+      <div class="form-group">
+        <label style="font-size:15px;font-weight:700;color:var(--primary)">📋 예약상태 변경</label>
+        <select id="statusSel" style="margin-top:7px;font-size:15px">
+          <option>예약접수</option><option>예약확정</option><option>검진완료</option><option>일정변경</option><option>예약취소</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="AA.closeModal()">닫기</button>
+      <button class="btn btn-primary" onclick="AA.saveStatus()">💾 상태 저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="cmc-toast" style="display:none;opacity:0"></div>
+
+<footer class="site-footer">
+  <strong>천안의료원 건강검진센터</strong> — 관리자 전용<br>
+  <span style="font-size:12px;opacity:.6">CMC Health Screening Platform v1.0</span>
+</footer>
+
+<script src="../data/programs_data_new.js"></script>
+<script src="../data/sample_data_new.js"></script>
+<script src="../services/db_service_new.js"></script>
+<script src="../services/stats_service_new.js"></script>
+<script src="../components/nav_new.js"></script>
+<script>
+'use strict';
+const AA = {
+  page: 1, pageSize: 15, filtered: [], selectedNo: null,
+
+  init() {
+    CMC_DB.initSampleIfEmpty();
+    CMC_Nav.render('admin');
+    setInterval(() => { const el = document.getElementById('clock'); if(el) el.textContent = new Date().toLocaleString('ko-KR'); }, 1000);
+    ['searchInput','fStatus','fProg','fDateFrom','fDateTo'].forEach(id =>
+      document.getElementById(id)?.addEventListener('input', () => { this.page = 1; this.render(); }));
+    this.render();
+  },
+
+  getFiltered() {
+    const s  = (document.getElementById('searchInput')?.value||'').trim().toLowerCase();
+    const st = document.getElementById('fStatus')?.value||'';
+    const pr = document.getElementById('fProg')?.value||'';
+    const f  = document.getElementById('fDateFrom')?.value||'';
+    const t  = document.getElementById('fDateTo')?.value||'';
+    return CMC_DB.getAll().filter(r => {
+      if (st && r.status  !== st) return false;
+      if (pr && r.program !== pr) return false;
+      if (f  && r.wishDate < f)  return false;
+      if (t  && r.wishDate > t)  return false;
+      if (s) {
+        const hay = [r.name, r.phone, r.reservationNo, r.company, r.program].join(' ').toLowerCase();
+        if (!hay.includes(s)) return false;
+      }
+      return true;
+    });
+  },
+
+  render() {
+    this.filtered = this.getFiltered();
+    this.renderStats(); this.renderTable(); this.renderPagination();
+  },
+
+  renderStats() {
+    const all = CMC_DB.getAll();
+    const c   = CMC_Stats.statusCounts();
+    const s   = id => { const el = document.getElementById(id); if(el) el.textContent = ''; };
+    document.getElementById('st-total').textContent    = all.length;
+    document.getElementById('st-접수').textContent     = c['예약접수']||0;
+    document.getElementById('st-확정').textContent     = c['예약확정']||0;
+    document.getElementById('st-완료').textContent     = c['검진완료']||0;
+    document.getElementById('st-취소변경').textContent = (c['예약취소']||0) + (c['일정변경']||0);
+  },
+
+  renderTable() {
+    const tbody = document.getElementById('mainTable');
+    const start = (this.page-1)*this.pageSize;
+    const pg    = this.filtered.slice(start, start+this.pageSize);
+    if (!pg.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:36px;color:var(--gray-500)">조회된 예약이 없습니다.</td></tr>'; return; }
+    tbody.innerHTML = pg.map(r => {
+      const m = CMC.STATUS[r.status]||{};
+      return `<tr>
+        <td data-label="예약번호"><code style="font-size:12px;color:var(--gray-500)">${CMC.esc(r.reservationNo)}</code></td>
+        <td data-label="접수일시" style="font-size:12px;color:var(--gray-500)">${CMC.formatDateTime(r.createdAt)}</td>
+        <td data-label="성명" style="font-weight:700">${CMC.esc(r.name)}</td>
+        <td data-label="연락처" style="font-family:monospace;font-size:13px">${CMC.maskPhone(r.phone)}</td>
+        <td data-label="프로그램">${CMC.esc(r.program)}</td>
+        <td data-label="검진일시" style="font-weight:700;color:var(--primary)">${CMC.esc(r.wishDate)} ${CMC.esc(r.wishTime)}</td>
+        <td data-label="수면">${r.sleep==='수면'?'💤 수면':'일반'}</td>
+        <td data-label="상태"><span class="status-badge ${m.cls||''}">${m.icon||''} ${CMC.esc(r.status)}</span></td>
+        <td data-label="관리"><button class="btn btn-outline btn-sm" onclick="AA.openModal('${CMC.esc(r.reservationNo)}')">상세</button></td>
+      </tr>`;
+    }).join('');
+  },
+
+  renderPagination() {
+    const wrap  = document.getElementById('pagination');
+    const total = Math.ceil(this.filtered.length / this.pageSize);
+    if (total <= 1) { wrap.innerHTML = `<div style="text-align:center;margin-top:12px;font-size:13px;color:var(--gray-500)">총 ${this.filtered.length}건</div>`; return; }
+    let h = `<div class="pagination"><button class="page-btn" onclick="AA.goPage(${this.page-1})" ${this.page===1?'disabled':''}>‹</button>`;
+    for (let i=1; i<=total; i++) {
+      if (total>7 && Math.abs(i-this.page)>2 && i!==1 && i!==total) { if(i===2||i===total-1) h+='<span style="padding:0 4px">…</span>'; continue; }
+      h += `<button class="page-btn ${i===this.page?'active':''}" onclick="AA.goPage(${i})">${i}</button>`;
+    }
+    h += `<button class="page-btn" onclick="AA.goPage(${this.page+1})" ${this.page===total?'disabled':''}>›</button><span style="font-size:13px;color:var(--gray-500);margin-left:8px">총 ${this.filtered.length}건</span></div>`;
+    wrap.innerHTML = h;
+  },
+
+  goPage(n) {
+    const t = Math.ceil(this.filtered.length/this.pageSize);
+    if (n<1||n>t) return;
+    this.page = n; this.renderTable(); this.renderPagination();
+  },
+
+  openModal(no) {
+    const r = CMC_DB.findByNo(no); if (!r) return;
+    this.selectedNo = no;
+    const m = CMC.STATUS[r.status]||{};
+    document.getElementById('mNo').textContent      = r.reservationNo;
+    document.getElementById('mStatus').className    = `status-badge ${m.cls||''}`;
+    document.getElementById('mStatus').textContent  = `${m.icon||''} ${r.status}`;
+    document.getElementById('dName').textContent    = r.name;
+    document.getElementById('dBirth').textContent   = r.birth;
+    document.getElementById('dPhone').textContent   = CMC.maskPhone(r.phone);
+    document.getElementById('dGender').textContent  = r.gender||'-';
+    document.getElementById('dProg').textContent    = r.program;
+    document.getElementById('dDate').textContent    = `${r.wishDate} ${r.wishTime}`;
+    document.getElementById('dSleep').textContent   = r.sleep;
+    document.getElementById('dCompany').textContent = r.company||'-';
+    document.getElementById('dTests').textContent   = r.optionalTests?.length ? r.optionalTests.join(', ') : '없음';
+    document.getElementById('dNote').textContent    = r.note||'-';
+    document.getElementById('dCreated').textContent = CMC.formatDateTime(r.createdAt);
+    document.getElementById('dUpdated').textContent = CMC.formatDateTime(r.updatedAt);
+    document.getElementById('statusSel').value      = r.status;
+    document.getElementById('detailModal').style.display = 'flex';
+  },
+  closeModal() { document.getElementById('detailModal').style.display='none'; this.selectedNo=null; },
+
+  saveStatus() {
+    if (!this.selectedNo) return;
+    const ns = document.getElementById('statusSel').value;
+    CMC_DB.update(this.selectedNo, { status: ns });
+    this.closeModal(); this.render();
+    this.toast(`"${ns}"(으)로 변경되었습니다.`);
+  },
+
+  toast(msg) {
+    let t = document.getElementById('cmc-toast');
+    t.style.display='block'; t.style.opacity='1'; t.textContent=msg;
+    clearTimeout(t._t); t._t = setTimeout(() => { t.style.opacity='0'; setTimeout(()=>t.style.display='none',300); }, 2200);
+  },
+
+  downloadCSV() {
+    if (!this.filtered.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+    const h = ['예약번호','접수일시','성명','연락처','성별','프로그램','희망검진일','희망시간','수면','선택검사','사업장','특이사항','상태'];
+    const rows = this.filtered.map(r => [
+      r.reservationNo, CMC.formatDateTime(r.createdAt), r.name, r.phone, r.gender||'',
+      r.program, r.wishDate, r.wishTime, r.sleep,
+      (r.optionalTests||[]).join('|'), r.company||'', r.note||'', r.status,
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`));
+    const csv = '﻿' + [h, ...rows].map(r=>r.join(',')).join('\r\n');
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})), download: `예약목록_${CMC.today()}.csv` });
+    a.click(); URL.revokeObjectURL(a.href);
+  },
+
+  clearFilters() {
+    ['searchInput','fStatus','fProg','fDateFrom','fDateTo'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    this.page=1; this.render();
+  },
+};
+document.addEventListener('DOMContentLoaded', () => AA.init());
+</script>
+</body>
+</html>

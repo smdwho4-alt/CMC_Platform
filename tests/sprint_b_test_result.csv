@@ -1,0 +1,39 @@
+﻿테스트명,결과,상세
+Slot 생성기 (영업일 4일 x 10타임),PASS,40개 생성
+Slot 생성기 휴진일 차단,PASS,2026-08-17 HOLIDAY → 0개
+Slot 생성기 정원 옵션,PASS,정원 1짜리 10개
+Slot 생성기 기존 Slot 보존,PASS,중복 생성 0개
+정상 예약 신청 → PENDING_APPROVAL,PASS,RSV-20260704-0001
+예약번호 형식 YYYYMMDD-0001,PASS,20260704-0001
+신청 후 Slot HOLD,PASS,
+AI 계정 승인 차단,PASS,승인 권한 없음: USR-9000 (reservation:approve 
+직원 승인 → CONFIRMED,PASS,approvedBy=USR-0002
+승인 후 Slot 점유 반영,PASS,"reservedCount=4, status=AVAILABLE (정원 6 미달 → AVAILABLE 복귀)"
+승인 시 Notification 생성 준비,PASS,
+예약 취소 → CANCELLED,PASS,
+취소 후 Slot AVAILABLE 복구,PASS,reservedCount=3
+동일 환자 동일일자 중복 차단,PASS,동일 환자 동일일자 예약 존재: RSV-20260702-0001 (CONFIRMED)
+FULL Slot 예약 차단,PASS,
+차단 시 대체 Slot 제공 (≤5),PASS,5개
+FULL Slot 대기예약(WAITING) 전환,PASS,waitingCount=2
+BLOCKED Slot 예약 차단,PASS,
+HOLD Slot 판정,PASS,
+전이표: COMPLETED→CONFIRMED 불가,PASS,
+전이표: REQUESTED→COMPLETED 불가,PASS,
+전이표: CONFIRMED→NO_SHOW 가능,PASS,
+전이표: CHANGED→PENDING_APPROVAL 가능,PASS,
+취소건 재승인 차단 + 감사기록,PASS,
+PENDING 상태 노쇼 차단,PASS,
+CONFIRMED → NO_SHOW 전환,PASS,
+직원 거절 → REJECTED + Slot 복구,PASS,
+예약 변경 → 재승인 대기,PASS,
+변경 후 기존/신규 Slot 상태,PASS,
+정원 도달 시 Slot FULL,PASS,
+FULL 전환 후 신규 신청 차단,PASS,
+대체 Slot 최대 5개 추천,PASS,"5개: ['SLOT-20260708-0830-A', 'SLOT-20260710-0830-A', 'SLOT-20260721-0900-A']..."
+추천 Slot 전부 AVAILABLE,PASS,
+추천 정렬: 요청일 가까운 순,PASS,"날짜거리=[0, 2, 13, 13, 13]"
+감사로그 누적 기록,PASS,3 → 30건
+표준 이벤트 10종 전부 발생,PASS,누락: 없음
+전체 데이터 무결성 (Validator 재사용),PASS,"오류 0건, 경고 0건"
+원본 data/ 미변경 확인,PASS,원본 예약 5건 유지

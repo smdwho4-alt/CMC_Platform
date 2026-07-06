@@ -1,0 +1,31 @@
+﻿테스트명,결과,상세
+Entity 20개 정의 확인,PASS,20개
+Patient 로드,PASS,4건
+Reservation 로드,PASS,5건
+Program 로드,PASS,6건
+OptionalTest 로드,PASS,6건
+Business 로드,PASS,3건
+Doctor 로드,PASS,3건
+Nurse 로드,PASS,3건
+Equipment 로드,PASS,4건
+Room 로드,PASS,8건
+Schedule 로드,PASS,4건
+Slot 로드,PASS,6건
+Consent 로드,PASS,4건
+Questionnaire 로드,PASS,2건
+CRM 로드,PASS,3건
+Dashboard 로드,PASS,2건
+Statistics 로드,PASS,2건
+AuditLog 로드,PASS,3건
+User 로드,PASS,4건
+Role 로드,PASS,5건
+Notification 로드,PASS,3건
+get_by_id 예약 조회,PASS,status=CONFIRMED
+레거시 상태 변환,PASS,
+없는 파일 방어,PASS,
+미등록 Entity 예외,PASS,
+Validation 오류 0건,PASS,"오류 0건, 경고 0건"
+예약 상태값 표준 준수,PASS,"사용된 상태: ['COMPLETED', 'CONFIRMED', 'PENDING_APPROVAL', 'REQUESTED', 'WAITING']"
+Slot 상태값 표준 준수,PASS,"사용된 상태: ['AVAILABLE', 'BLOCKED', 'FULL', 'HOLD']"
+Statistics KPI 필드 확인,PASS,"2건 (기간: 2026-05, 2026-06)"
+PII 플래그 지정 확인,PASS,"PII Entity 11개: Patient, Reservation, Business, Doctor, Nurse, Consent, Questionnaire, CRM, AuditLog, User, Notification"

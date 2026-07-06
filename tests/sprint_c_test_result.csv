@@ -1,0 +1,39 @@
+구분,테스트명,결과,상세
+자동테스트,데이터 로드 (12개 Entity),PASS,예약 5건 / Slot 6건
+자동테스트,승인 대기(PENDING_APPROVAL) 조회,PASS,RSV-20260702-0002
+자동테스트,상태 필터 CONFIRMED,PASS,
+자동테스트,상태 필터 WAITING,PASS,
+자동테스트,검색: 수검자명,PASS,
+자동테스트,검색: 전화 뒷4자리,PASS,'0002' → 2건
+자동테스트,검색: 예약번호,PASS,
+자동테스트,검색: 프로그램 코드,PASS,
+자동테스트,검색: 날짜,PASS,
+자동테스트,예약 상세 조회,PASS,
+자동테스트,가능한 다음 액션 (state_machine 미러),PASS,"CANCELLED, CONFIRMED, REJECTED"
+자동테스트,종결 상태(COMPLETED) 액션 없음,PASS,
+자동테스트,생년월일 마스킹 YYYY****,PASS,
+자동테스트,전화번호 마스킹 010-****-1234,PASS,
+자동테스트,상세 표시수준 STAFF=FULL / AI=MASKED,PASS,
+자동테스트,KPI 승인대기/확정/노쇼,PASS,pending 1 / confirmed 1 / noShow 0
+자동테스트,KPI Slot 가동률 계산,PASS,60%
+자동테스트,KPI 온라인 예약 비율,PASS,60% (WEB 2 + AI 1 / 5건)
+자동테스트,Slot 목록 + 검사실/장비/담당의 표시,PASS,6건
+자동테스트,AI 계정 승인 차단,PASS,승인 권한 없음: USR-9000
+자동테스트,직원 승인 → CONFIRMED,PASS,
+자동테스트,승인 감사로그 기록,PASS,
+자동테스트,취소 → CANCELLED + Slot 복구,PASS,
+자동테스트,취소건 재승인 차단 + INVALID_TRANSITION 기록,PASS,
+자동테스트,HOLD 해제 + SLOT_RELEASED 기록,PASS,
+자동테스트,HOLD 해제 권한 없음 차단(AI),PASS,
+자동테스트,일정 탭 의사/휴진일,PASS,
+자동테스트,감사로그 이벤트 필터,PASS,
+자동테스트,감사로그 대상 검색,PASS,
+브라우저검증,관리자 화면 정상 로드 (콘솔 오류 0),PASS,http://localhost:4000/admin/
+브라우저검증,Dashboard KPI 카드 7종 렌더링,PASS,오늘신청/승인대기/확정/취소/노쇼/가동률/온라인비율
+브라우저검증,승인 대기함 표시 + 마스킹(1988****),PASS,
+브라우저검증,승인 버튼 클릭 → CONFIRMED + Slot 점유 + 감사기록,PASS,reservedCount 2→3 / 배지 (1)→(0)
+브라우저검증,예약 상세 + allowed_next 칩 표시,PASS,"CANCELLED, CHANGED, COMPLETED, NO_SHOW"
+브라우저검증,Slot 화면 렌더 + HOLD 해제 버튼 소멸,PASS,6행
+브라우저검증,감사로그 화면 렌더,PASS,5행 (세션 조작 포함)
+브라우저검증,AI 계정 HOLD 해제 차단,PASS,Slot 관리 권한 없음: USR-9000
+합계,자동 29 + 브라우저 8 = 37건,전체 PASS,FAIL 0

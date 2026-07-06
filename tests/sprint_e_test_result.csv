@@ -1,0 +1,32 @@
+﻿테스트명,결과,상세
+Function Tool 8종 정의,PASS,"create_crm_notification, create_reservation_request, list_available_slots, recommend_alternative_slots, recommend_optional_tests, recommend_program, search_knowledge, start_questionnaire"
+예약 확정 도구 미제공,PASS,
+의료 진단 질문 차단,PASS,
+검사결과 해석 차단,PASS,
+처방 상담 차단,PASS,
+응급 의심 → 119 안내,PASS,
+일반 예약 문의 통과,PASS,
+즉시확정 → 절차 안내 전환,PASS,
+오케스트레이터 의료차단 응답,PASS,
+의료 문의 CRM 에스컬레이션,PASS,NTF-0004
+AI 예약 신청 성공,PASS,RSV-20260704-0001
+PENDING_APPROVAL 파일 기록,PASS,
+직원 확인 후 확정 문구 고정,PASS,
+신청 채널 AI_ASSISTANT,PASS,
+AI 확정 API 403,PASS,승인 권한 없음: USR-9000 (reservation:approve 필요)
+미등록 도구 실행 차단,PASS,
+확정 요청 → 절차 안내 응답,PASS,
+FULL Slot 신청 거부 + 사유,PASS,
+대체 Slot ≤5 추천,PASS,1개
+프로그램 추천 (27세→YOUNG),PASS,YOUNG한 종합검진
+추천 면책 문구 포함,PASS,
+선택검사 안내 + 수가 미등록 표기,PASS,
+KB 검색 (금식 FAQ),PASS,KB-FAQ-0001
+사전문진 DRAFT 생성,PASS,QST-0003
+문진에 판단 없음 (수집 안내),PASS,
+CRM 상담 접수 + Notification PENDING,PASS,NTF-0005
+CRM 기록(OPEN) 생성,PASS,
+운영 브리핑 (직원 계정 경유),PASS,승인대기 2건
+감사로그 생성 (AI 신청 기록),PASS,AI 신청 로그 2건
+전체 데이터 무결성,PASS,"오류 0건, 경고 0건"
+원본 data/ 미변경,PASS,

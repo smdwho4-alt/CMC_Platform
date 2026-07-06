@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workflow — CMC 건강검진 예약 프로세스</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', sans-serif; background: #f5f7fa; color: #222; padding: 24px; }
+  h1  { font-size: 20px; color: #1a4f8a; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 28px; }
+  h2  { font-size: 14px; color: #1a4f8a; margin: 28px 0 12px; border-left: 4px solid #1a4f8a; padding-left: 10px; }
+
+  /* ── 수영레인 다이어그램 ── */
+  .swimlane-wrap { overflow-x: auto; }
+  .swimlane { border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.10); min-width: 820px; }
+  .lane-header-row { display: grid; grid-template-columns: 120px repeat(5, 1fr); }
+  .lane-header { padding: 10px 8px; font-size: 12px; font-weight: 700; color: #fff; text-align: center; }
+  .lh-phase   { background: #546e7a; }
+  .lh-patient { background: #1a4f8a; }
+  .lh-admin   { background: #7b1fa2; }
+  .lh-nurse   { background: #2e7d32; }
+  .lh-doctor  { background: #e65100; }
+  .lh-system  { background: #00695c; }
+
+  .lane-row { display: grid; grid-template-columns: 120px repeat(5, 1fr); border-top: 1px solid #e8e8e8; }
+  .lane-row:nth-child(even) { background: #fafafa; }
+  .lane-phase { background: #f0f4ff; padding: 12px 8px; font-size: 11px; font-weight: 700; color: #1a4f8a; display: flex; align-items: center; justify-content: center; text-align: center; border-right: 2px solid #c8d8f0; }
+  .lane-cell  { padding: 10px 8px; font-size: 12px; min-height: 64px; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; }
+
+  .step-box {
+    background: #fff; border-radius: 6px; padding: 6px 10px; font-size: 11px;
+    text-align: center; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    line-height: 1.4;
+  }
+  .step-blue   { border-left: 3px solid #1a4f8a; color: #1a4f8a; }
+  .step-purple { border-left: 3px solid #7b1fa2; color: #7b1fa2; }
+  .step-green  { border-left: 3px solid #2e7d32; color: #2e7d32; }
+  .step-orange { border-left: 3px solid #e65100; color: #e65100; }
+  .step-teal   { border-left: 3px solid #00695c; color: #00695c; }
+  .step-grey   { border-left: 3px solid #999; color: #555; }
+  .arrow-down  { font-size: 16px; color: #aaa; }
+
+  /* ── 상태 흐름도 ── */
+  .status-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .status-node {
+    padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    white-space: nowrap;
+  }
+  .sn-receive  { background: #e3f2fd; color: #1565c0; border: 2px solid #90caf9; }
+  .sn-confirm  { background: #e8f5e9; color: #2e7d32; border: 2px solid #a5d6a7; }
+  .sn-inprog   { background: #fff8e1; color: #e65100; border: 2px solid #ffe082; }
+  .sn-done     { background: #f3e5f5; color: #7b1fa2; border: 2px solid #ce93d8; }
+  .sn-change   { background: #fff3e0; color: #f57c00; border: 2px solid #ffcc80; }
+  .sn-cancel   { background: #fde8e8; color: #c62828; border: 2px solid #ef9a9a; }
+  .flow-arrow  { font-size: 18px; color: #bbb; }
+  .flow-branch { display: flex; flex-direction: column; gap: 6px; }
+
+  /* ── 결제·결과 흐름 ── */
+  .mini-flow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  .mini-node { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+
+  .info-box { background: #fff; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin: 8px 0; }
+  .info-row { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.7; }
+  .info-label { color: #1a4f8a; font-weight: 700; min-width: 90px; }
+</style>
+</head>
+<body>
+
+<h1>🔄 Workflow Diagram — CMC 건강검진 예약 프로세스</h1>
+<p class="subtitle">CMC Health Screening Platform v1.0 Phase 4.5 | 천안의료원 건강검진센터 | 2026-07-01</p>
+
+<!-- ── 1. 수영레인 다이어그램 ── -->
+<h2>1. 수검자·관리자·의료진 역할 흐름 (Swimlane)</h2>
+<div class="swimlane-wrap">
+<div class="swimlane">
+  <div class="lane-header-row">
+    <div class="lane-header lh-phase">단계</div>
+    <div class="lane-header lh-patient">수검자</div>
+    <div class="lane-header lh-admin">행정담당자</div>
+    <div class="lane-header lh-nurse">담당간호사</div>
+    <div class="lane-header lh-doctor">문진의사</div>
+    <div class="lane-header lh-system">시스템(Apps Script)</div>
+  </div>
+
+  <!-- 1단계 -->
+  <div class="lane-row">
+    <div class="lane-phase">① 예약 신청</div>
+    <div class="lane-cell">
+      <div class="step-box step-blue">예약 양식 작성<br>프로그램·희망일 선택</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-blue">온라인 제출</div>
+    </div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell">
+      <div class="step-box step-teal">예약번호 자동생성<br>YYYYMMDD-NNNN</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-teal">Sheets 행 추가<br>상태: 예약접수</div>
+    </div>
+  </div>
+
+  <!-- 2단계 -->
+  <div class="lane-row">
+    <div class="lane-phase">② 예약 확인·확정</div>
+    <div class="lane-cell">
+      <div class="step-box step-blue">접수 확인 문자 수신</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-purple">예약 목록 확인<br>검진일·검진실 배정</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-purple">문진의사·간호사 배정<br>예상비용 입력</div>
+    </div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell">
+      <div class="step-box step-teal">상태 → 예약확정<br>예약확정일 자동기록</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-teal">확정 안내 문자 발송</div>
+    </div>
+  </div>
+
+  <!-- 3단계 -->
+  <div class="lane-row">
+    <div class="lane-phase">③ 검진 당일 접수</div>
+    <div class="lane-cell">
+      <div class="step-box step-blue">검진센터 내원<br>접수 데스크 방문</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-purple">예약 확인<br>접수시간 기록</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-purple">검진실 안내</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-green">수검자 안내<br>검진 전 준비 확인</div>
+    </div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell">
+      <div class="step-box step-teal">상태 → 검진중<br>접수시간·검진시작 기록</div>
+    </div>
+  </div>
+
+  <!-- 4단계 -->
+  <div class="lane-row">
+    <div class="lane-phase">④ 검진 진행</div>
+    <div class="lane-cell">
+      <div class="step-box step-blue">각 검사실 순환<br>검사 수검</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-purple">검진 진행 모니터링</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-green">검사 진행 보조<br>채혈·신체계측 등</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-orange">문진 상담<br>건강 이력 확인</div>
+    </div>
+    <div class="lane-cell"></div>
+  </div>
+
+  <!-- 5단계 -->
+  <div class="lane-row">
+    <div class="lane-phase">⑤ 검진 완료·결제</div>
+    <div class="lane-cell">
+      <div class="step-box step-blue">결제 진행</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-blue">영수증 수령</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-purple">결제 처리<br>결제상태 → 결제완료</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-green">검진종료 확인<br>검진종료시간 기록</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-orange">결과 소견 작성</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-teal">상태 → 검진완료<br>검진종료 자동기록</div>
+    </div>
+  </div>
+
+  <!-- 6단계 -->
+  <div class="lane-row">
+    <div class="lane-phase">⑥ 결과 발송·재예약</div>
+    <div class="lane-cell">
+      <div class="step-box step-blue">결과 수령<br>(우편·이메일·방문)</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-blue">재예약 결정</div>
+    </div>
+    <div class="lane-cell">
+      <div class="step-box step-purple">결과 발송 처리<br>결과발송 → 발송완료</div>
+      <div class="arrow-down">↓</div>
+      <div class="step-box step-purple">재예약여부 업데이트</div>
+    </div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell"></div>
+    <div class="lane-cell">
+      <div class="step-box step-teal">결과발송·재예약여부<br>자동 업데이트</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ── 2. 예약 상태 흐름도 ── -->
+<h2>2. 예약 상태 전이도 (State Machine)</h2>
+<div class="info-box">
+  <div class="status-flow">
+    <div class="status-node sn-receive">📋 예약접수</div>
+    <div class="flow-arrow">→</div>
+    <div class="status-node sn-confirm">✅ 예약확정</div>
+    <div class="flow-arrow">→</div>
+    <div class="status-node sn-inprog">🔄 검진중</div>
+    <div class="flow-arrow">→</div>
+    <div class="status-node sn-done">🎉 검진완료</div>
+  </div>
+  <div class="status-flow" style="margin-top:8px;">
+    <div class="status-node sn-receive">📋 예약접수</div>
+    <div class="flow-arrow">→</div>
+    <div class="status-node sn-change">🔄 일정변경</div>
+    <div class="flow-arrow">→</div>
+    <div class="status-node sn-confirm">✅ 예약확정</div>
+  </div>
+  <div class="status-flow" style="margin-top:8px;">
+    <div class="status-node sn-receive">📋 예약접수</div>
+    <div class="flow-arrow">→</div>
+    <div class="status-node sn-cancel">❌ 예약취소</div>
+  </div>
+  <div class="status-flow" style="margin-top:8px;">
+    <div class="status-node sn-confirm">✅ 예약확정</div>
+    <div class="flow-arrow">→</div>
+    <div class="status-node sn-cancel">❌ 예약취소</div>
+  </div>
+</div>
+
+<!-- ── 3. 결제·결과 흐름 ── -->
+<h2>3. 결제 및 결과 발송 흐름</h2>
+<div class="info-box">
+  <div class="info-row"><span class="info-label">결제 흐름</span>
+    <div class="mini-flow">
+      <div class="mini-node" style="background:#fff3cd;color:#856404;">미결제</div>
+      <span>→</span>
+      <div class="mini-node" style="background:#e8f5e9;color:#2e7d32;">결제완료</div>
+      <span style="color:#999;">또는</span>
+      <div class="mini-node" style="background:#fff8e1;color:#e65100;">부분결제</div>
+      <span>→</span>
+      <div class="mini-node" style="background:#e8f5e9;color:#2e7d32;">결제완료</div>
+      <span style="color:#999;">| 환불 시</span>
+      <div class="mini-node" style="background:#fde8e8;color:#c62828;">환불</div>
+    </div>
+  </div>
+  <div class="info-row" style="margin-top:10px;"><span class="info-label">결과 발송</span>
+    <div class="mini-flow">
+      <div class="mini-node" style="background:#f3f3f3;color:#555;">미발송</div>
+      <span>→</span>
+      <div class="mini-node" style="background:#e3f2fd;color:#1565c0;">발송완료</div>
+      <span>→</span>
+      <div class="mini-node" style="background:#e8f5e9;color:#2e7d32;">수령확인</div>
+      <span style="color:#999;">| 미수령 시</span>
+      <div class="mini-node" style="background:#fff3e0;color:#f57c00;">미수령</div>
+      <span>→</span>
+      <div class="mini-node" style="background:#e8f5e9;color:#2e7d32;">수령확인</div>
+    </div>
+  </div>
+  <div class="info-row" style="margin-top:10px;"><span class="info-label">재예약</span>
+    <div class="mini-flow">
+      <div class="mini-node" style="background:#f3f3f3;color:#555;">해당없음</div>
+      <span>→</span>
+      <div class="mini-node" style="background:#fff8e1;color:#e65100;">재예약예정</div>
+      <span>→</span>
+      <div class="mini-node" style="background:#e8f5e9;color:#2e7d32;">재예약완료</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 4. API 액션 흐름 ── -->
+<h2>4. Apps Script API 요청 흐름</h2>
+<div class="info-box">
+  <div class="info-row"><span class="info-label">예약 등록</span>브라우저 → POST {action:"create", data:{…}} → Apps Script → Sheets 행 추가 → {ok:true, reservationNo:"…"}</div>
+  <div class="info-row" style="margin-top:6px;"><span class="info-label">목록 조회</span>브라우저 → GET ?action=list[&status=…&dateFrom=…] → Apps Script → Sheets 읽기 → [{…}, …]</div>
+  <div class="info-row" style="margin-top:6px;"><span class="info-label">상태 변경</span>브라우저 → POST {action:"updateStatus", no:"…", status:"…"} → Apps Script → 해당 행 업데이트</div>
+  <div class="info-row" style="margin-top:6px;"><span class="info-label">운영 정보</span>브라우저 → POST {action:"updateOps", no:"…", data:{examRoom, doctor, …}} → Apps Script → 19~29컬럼 업데이트</div>
+  <div class="info-row" style="margin-top:6px;"><span class="info-label">당일 요약</span>브라우저 → GET ?action=summary[&date=YYYY-MM-DD] → Apps Script → {byStatus, byRoom, byPayment, …}</div>
+</div>
+
+<p style="margin-top:32px; font-size:12px; color:#999;">
+  CMC Health Screening Platform v1.0 Phase 4.5 | 2026-07-01
+</p>
+</body>
+</html>

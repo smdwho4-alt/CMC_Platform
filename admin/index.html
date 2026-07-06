@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSHSP 관리자 콘솔 — 천안의료원 건강검진센터</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>CSHSP 관리자 콘솔</h1>
+    <div class="sub">천안의료원 건강검진센터</div>
+    <nav class="menu" id="menu">
+      <button data-view="dashboard" class="active">📊 Dashboard 요약</button>
+      <button data-view="pending">✅ 예약 승인 대기 <span id="pendingCount"></span></button>
+      <button data-view="reservations">📋 전체 예약 목록</button>
+      <button data-view="slots">🕐 Slot 관리</button>
+      <button data-view="schedules">📅 일정 관리</button>
+      <button data-view="audit">🧾 감사로그</button>
+      <a href="questionnaire_review.html" style="display:block;padding:11px 20px;color:#dbe7f3;text-decoration:none;font-size:14px">📝 문진 검토 (Live)</a>
+      <a href="ai_dashboard.html" style="display:block;padding:11px 20px;color:#dbe7f3;text-decoration:none;font-size:14px">🤖 AI 상담 통계 (Live)</a>
+    </nav>
+    <div class="mode">
+      <b>Mock 모드</b><br>
+      조작은 세션 메모리에만 반영됩니다.<br>
+      Sprint D에서 Reservation Engine API로 연결됩니다.
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h2 id="viewTitle">Dashboard 요약</h2>
+      <div class="actor">
+        <span>로그인 직원:</span>
+        <select id="actorSelect" aria-label="현재 사용자"></select>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <section id="view-dashboard">
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="panel">
+        <h3>승인 대기 예약 (바로가기)</h3>
+        <div id="dashPending"></div>
+      </div>
+    </section>
+
+    <!-- 승인 대기 -->
+    <section id="view-pending" class="hidden">
+      <div class="panel">
+        <h3>PENDING_APPROVAL 예약 — 승인/거절</h3>
+        <div id="pendingTable"></div>
+      </div>
+    </section>
+
+    <!-- 전체 예약 목록 -->
+    <section id="view-reservations" class="hidden">
+      <div class="panel">
+        <div class="filterbar">
+          <select id="statusFilter" aria-label="상태 필터"></select>
+          <input type="search" id="searchInput" placeholder="예약번호 / 수검자명 / 전화 뒷4자리 / 프로그램 / 날짜(YYYY-MM-DD)">
+          <span id="resvCount" style="color:var(--ink-sub);font-size:12.5px"></span>
+        </div>
+        <div id="resvTable"></div>
+      </div>
+    </section>
+
+    <!-- 예약 상세 -->
+    <section id="view-detail" class="hidden">
+      <span class="back-link" id="backLink">← 목록으로</span>
+      <div class="panel" id="detailPanel"></div>
+    </section>
+
+    <!-- Slot 관리 -->
+    <section id="view-slots" class="hidden">
+      <div class="panel">
+        <div class="filterbar">
+          <select id="slotStatusFilter">
+            <option value="">전체 상태</option>
+            <option>AVAILABLE</option><option>FULL</option><option>WAITING</option>
+            <option>DUPLICATED</option><option>HOLD</option><option>BLOCKED</option>
+          </select>
+        </div>
+        <div id="slotTable"></div>
+      </div>
+    </section>
+
+    <!-- 일정 관리 -->
+    <section id="view-schedules" class="hidden">
+      <div class="tabs" id="schedTabs">
+        <button data-tab="doctor" class="active">의사</button>
+        <button data-tab="nurse">간호사</button>
+        <button data-tab="room">검사실</button>
+        <button data-tab="equipment">장비</button>
+        <button data-tab="holiday">휴진일/공휴일</button>
+      </div>
+      <div class="panel" id="schedPanel"></div>
+    </section>
+
+    <!-- 감사로그 -->
+    <section id="view-audit" class="hidden">
+      <div class="panel">
+        <div class="filterbar">
+          <select id="auditAction"><option value="">전체 이벤트</option></select>
+          <input type="search" id="auditQuery" placeholder="예약번호 / 사용자">
+          <input type="date" id="auditDate">
+        </div>
+        <div id="auditTable"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast"></div>
+<script src="admin_api.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

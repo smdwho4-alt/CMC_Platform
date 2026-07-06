@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>CSHSP Admin Console — Sprint C 테스트</title>
+<style>
+  body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; font-size: 14px; }
+  table { border-collapse: collapse; margin-top: 12px; }
+  td, th { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+  .PASS { color: #2e7d32; font-weight: 700; } .FAIL { color: #c62828; font-weight: 700; }
+</style>
+</head>
+<body>
+<h2>CSHSP Admin Console — Sprint C 자동 테스트</h2>
+<div id="summary">실행 중…</div>
+<table id="results"><thead><tr><th>#</th><th>테스트</th><th>결과</th><th>상세</th></tr></thead><tbody></tbody></table>
+
+<script src="admin_api.js"></script>
+<script>
+'use strict';
+const RESULTS = [];
+function check(name, ok, detail = '') {
+  RESULTS.push({ name, result: ok ? 'PASS' : 'FAIL', detail: String(detail) });
+}
+
+(async () => {
+  try {
+    await AdminAPI.loadAll('../data/');
+
+    // 1. 데이터 로드
+    check('데이터 로드 (12개 Entity)', AdminAPI.all('Reservation').length >= 5
+      && AdminAPI.all('Slot').length >= 6 && AdminAPI.all('AuditLog').length >= 3,
+      `예약 ${AdminAPI.all('Reservation').length}건, Slot ${AdminAPI.all('Slot').length}건`);
+
+    // 2. 승인 대기 조회
+    const pending = AdminAPI.pendingReservations();
+    check('승인 대기(PENDING_APPROVAL) 조회', pending.length === 1 && pending[0].id === 'RSV-20260702-0002',
+      pending.map((r) => r.id).join(', '));
+
+    // 3. 상태별 필터
+    check('상태 필터 CONFIRMED', AdminAPI.filterReservations({ status: 'CONFIRMED' }).length === 1);
+    check('상태 필터 WAITING', AdminAPI.filterReservations({ status: 'WAITING' }).length === 1);
+
+    // 4. 검색: 수검자명 / 전화 뒷4자리 / 예약번호 / 프로그램 / 날짜
+    check('검색: 수검자명', AdminAPI.filterReservations({ query: '테스트박' }).length === 1);
+    check('검색: 전화 뒷4자리', AdminAPI.filterReservations({ query: '0002' }).length >= 1,
+      `'0002' → ${AdminAPI.filterReservations({ query: '0002' }).length}건`);
+    check('검색: 예약번호', AdminAPI.filterReservations({ query: 'RSV-20260702-0004' }).length === 1);
+    check('검색: 프로그램 코드', AdminAPI.filterReservations({ query: 'VIP' }).length >= 1);
+    check('검색: 날짜', AdminAPI.filterReservations({ query: '2026-07-08' }).length === 2);
+
+    // 5. 상세 + allowed_next
+    const d = AdminAPI.reservationDetail('RSV-20260702-0002');
+    check('예약 상세 조회', !!d && d.patient.id === 'PT-2026-0002' && d.program.id === 'PRG-BASIC');
+    check('가능한 다음 액션 (state_machine 미러)',
+      JSON.stringify(d.allowedNext) === JSON.stringify(['CANCELLED', 'CONFIRMED', 'REJECTED']),
+      d.allowedNext.join(', '));
+    const dDone = AdminAPI.reservationDetail('RSV-20260702-0004');
+    check('종결 상태(COMPLETED) 액션 없음', dDone.allowedNext.length === 0);
+
+    // 6. 개인정보 마스킹
+    check('생년월일 마스킹 YYYY****', Privacy.maskBirth('1988-11-02') === '1988****');
+    check('전화번호 마스킹 010-****-1234', Privacy.maskPhone('010-1234-5678') === '010-****-5678');
+    check('상세 표시수준: STAFF=FULL / AI=MASKED',
+      Privacy.detailLevel('ROLE-STAFF') === 'FULL' && Privacy.detailLevel('ROLE-AI-AGENT') === 'MASKED');
+
+    // 7. Dashboard KPI
+    const k = AdminAPI.computeKPI('2026-07-02');
+    check('KPI: 승인대기/확정/노쇼', k.pending === 1 && k.confirmed === 1 && k.noShow === 0,
+      JSON.stringify(k));
+    check('KPI: Slot 가동률 계산', k.slotUtilization > 0 && k.slotUtilization <= 100, `${k.slotUtilization}%`);
+    check('KPI: 온라인 예약 비율', k.onlineRatio === 60, `${k.onlineRatio}% (WEB 2 + AI 1 / 5건)`);
+
+    // 8. Slot 목록 (검사실/장비/담당의 조인)
+    const slots = AdminAPI.slotRows();
+    check('Slot 목록 + 검사실/장비/담당의 표시', slots.length >= 6
+      && slots.every((s) => s.roomName && s.doctorNames !== undefined), `${slots.length}건`);
+
+    // 9. 승인 권한: AI 계정 차단 / 직원 허용 (+ 감사로그)
+    const aiTry = AdminAPI.approveReservation('RSV-20260702-0002', 'USR-9000');
+    check('AI 계정 승인 차단', !aiTry.success, aiTry.error);
+    const auditBefore = AdminAPI.all('AuditLog').length;
+    const ok = AdminAPI.approveReservation('RSV-20260702-0002', 'USR-0002');
+    check('직원 승인 → CONFIRMED', ok.success && ok.reservation.status === 'CONFIRMED');
+    check('승인 감사로그 기록', AdminAPI.all('AuditLog').length > auditBefore
+      && AdminAPI.all('AuditLog').some((l) => l.action === 'RESERVATION_APPROVED' && l.entityId === 'RSV-20260702-0002'));
+
+    // 10. 취소 + Slot 복구
+    const cancel = AdminAPI.cancelReservation('RSV-20260702-0002', 'USR-0002', 'QA');
+    const slotAfter = AdminAPI.byId('Slot', 'SLOT-20260710-0830-A');
+    check('취소 → CANCELLED + Slot 복구', cancel.success && slotAfter.status === 'AVAILABLE');
+
+    // 11. 잘못된 전이 차단 (취소건 재승인)
+    const again = AdminAPI.approveReservation('RSV-20260702-0002', 'USR-0002');
+    check('취소건 재승인 차단 + INVALID_TRANSITION 기록', !again.success
+      && AdminAPI.all('AuditLog').some((l) => l.action === 'INVALID_TRANSITION'));
+
+    // 12. HOLD 해제
+    const rel = AdminAPI.releaseHold('SLOT-20260715-1000-A', 'USR-0002');
+    check('HOLD 해제 + SLOT_RELEASED 기록', rel.success && rel.slot.status === 'AVAILABLE'
+      && AdminAPI.all('AuditLog').some((l) => l.action === 'SLOT_RELEASED' && l.entityId === 'SLOT-20260715-1000-A'));
+    const relDenied = AdminAPI.releaseHold('SLOT-20260708-0900-A', 'USR-9000');
+    check('HOLD 해제 권한 없음 차단(AI)', !relDenied.success);
+
+    // 13. 일정 탭
+    check('일정 탭: 의사/휴진일', AdminAPI.scheduleTab('doctor').length === 3
+      && AdminAPI.scheduleTab('holiday').length === 1);
+
+    // 14. 감사로그 필터
+    check('감사로그 이벤트 필터', AdminAPI.filterAudit({ action: 'RESERVATION_APPROVED' }).length >= 2);
+    check('감사로그 대상 검색', AdminAPI.filterAudit({ query: 'RSV-20260702-0002' }).length >= 3);
+  } catch (err) {
+    check('테스트 실행', false, err.message);
+  }
+
+  const fails = RESULTS.filter((r) => r.result === 'FAIL').length;
+  document.getElementById('summary').innerHTML =
+    `<b>총 ${RESULTS.length}건 중 <span class="PASS">PASS ${RESULTS.length - fails}</span> / <span class="FAIL">FAIL ${fails}</span></b>`;
+  document.querySelector('#results tbody').innerHTML = RESULTS.map((r, i) =>
+    `<tr><td>${i + 1}</td><td>${r.name}</td><td class="${r.result}">${r.result}</td><td>${r.detail}</td></tr>`).join('');
+  window.TEST_RESULTS = RESULTS;
+  window.TEST_DONE = true;
+})();
+</script>
+</body>
+</html>
