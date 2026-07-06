@@ -201,7 +201,7 @@ async function dashboardInit() {
   }
 
   renderPageHeader();
-  renderKPI(summary, weekList);
+  renderKPI(summary, weekList, recentList); // [HotFix #1] recentList → 누적 KPI 집계
   renderTodaySchedule(weekList);
   renderWeeklyChart(weekList);
   renderRecentTable(recentList);
@@ -221,11 +221,12 @@ function renderPageHeader() {
 }
 
 /* ── KPI 카드 ──
-   summary: GAS ?action=summary 응답 data, null이면 localStorage 폴백
-   weekList: GAS ?action=list 이번주 배열, null이면 폴백
+   summary:    GAS ?action=summary 응답 data, null이면 localStorage 폴백
+   weekList:   GAS ?action=list 이번주 배열, null이면 폴백
+   recentList: GAS ?action=list 전체 배열 → 누적 KPI 집계 [HotFix #1]
 */
-function renderKPI(summary, weekList) {
-  const counts = CMC_DashboardSheets.statusCounts(summary);
+function renderKPI(summary, weekList, recentList) {
+  const counts = CMC_DashboardSheets.statusCounts(summary, recentList);
   const kpi    = CMC_DashboardSheets.todayKPI(summary, weekList);
   setText('kpiToday',  kpi.todayActive);
   setText('kpi접수',   counts['예약접수']);
@@ -361,12 +362,4 @@ function setText(id, val) {
 }
 
 /* ── 실행 ── */
-document.addEventListener('DOMContentLoaded', () => {
-  CMC_Nav.render('dashboard');
-  dashboardInit();
-  // 1분마다 자동 새로고침
-  setInterval(dashboardInit, 60000);
-});
-</script>
-</body>
-</html>
+document.addEventListener('DOMContentL

@@ -17,7 +17,7 @@ const CMC_CONFIG = {
    *  'local'        : localStorage 기반 (시제품 기본값)
    *  'google'       : Apps Script Web App 경유 (운영)
    * ──────────────────────────────────────────────────── */
-  dataSource: 'google',
+  dataSource: 'local',
 
   /* ── Apps Script Web App ────────────────────────────
    *  Phase 4 핵심: 클라이언트 → Apps Script → Google Sheets
@@ -25,7 +25,7 @@ const CMC_CONFIG = {
    *  형식: https://script.google.com/macros/s/[SCRIPT_ID]/exec
    * ──────────────────────────────────────────────────── */
   appsScript: {
-    webAppUrl:  'https://script.google.com/macros/s/AKfycbzHYWqERR8_hHxzIgCNwvrU8NLtZqu9RVuxezTBWtUKcTleAgcqRhYPX5rnHAM7uCGjng/exec', // Apps Script 배포 후 발급 URL (필수)
+    webAppUrl:  '',          // Apps Script 배포 후 발급 URL (필수)
     sheetName:  '예약현황',  // Google Sheets 시트명
     timezone:   'Asia/Seoul',
   },
@@ -115,4 +115,6 @@ const CMC_CONFIG = {
   },
 
   isGoogle()       { return this.dataSource === 'google'; },
-  isLocal()      
+  isLocal()        { return this.dataSource === 'local'; },
+  hasWebAppUrl()   { return !!this.appsScript.webAppUrl; },
+};

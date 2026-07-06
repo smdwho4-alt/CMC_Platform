@@ -78,13 +78,11 @@ const CMC_DashboardSheets = {
     return json.data || [];
   },
 
-  /** C. 최근 30일 목록 (최근 예약 + 프로그램별 분포) */
+  /** C. 전체 목록 (날짜 필터 없음 → 모든 예약 조회, 누적 KPI + 최근 테이블 + 프로그램별 분포) */
   async fetchRecentList() {
-    const json = await this._get({
-      action:   'list',
-      dateFrom: this._daysAgo(30),
-      dateTo:   this._today(),
-    });
+    // [HotFix #1] wishDate 기준 날짜 필터 제거:
+    // 미래 희망검진일이나 30일 이전 예약도 표시되도록 전체 조회.
+    const json = await this._get({ action: 'list' });
     return json.data || [];
   },
 
@@ -112,14 +110,23 @@ const CMC_DashboardSheets = {
 
   /* ── 데이터 변환: Sheets 데이터 → 기존 렌더 함수 호환 형태 ── */
 
-  /** KPI 카드용 status 카운트 */
-  statusCounts(summary) {
+  /** KPI 카드용 status 카운트
+   * [HotFix #1] allList(전체 예약 배열)가 있으면 누적 집계 사용.
+   * summary만 있으면 오늘 데이터만 집계 → 미래 예약이 0으로 보이는 문제 방지.
+   */
+  statusCounts(summary, allList) {
+    const statuses = typeof CMC !== 'undefined' ? CMC.STATUS_LIST
+      : ['예약접수','예약확정','검진완료','일정변경','예약취소'];
+    // allList 우선: 전체 예약 기준 누적 집계
+    if (allList) {
+      const counts = { total: allList.length };
+      statuses.forEach(s => { counts[s] = allList.filter(r => r.status === s).length; });
+      return counts;
+    }
+    // fallback: summary(오늘) 또는 localStorage
     if (!summary) return CMC_Stats.statusCounts();
     const counts = { total: summary.total || 0 };
-    (typeof CMC !== 'undefined' ? CMC.STATUS_LIST : ['예약접수','예약확정','검진완료','일정변경','예약취소'])
-      .forEach(s => {
-        counts[s] = (summary.byStatus && summary.byStatus[s]) || 0;
-      });
+    statuses.forEach(s => { counts[s] = (summary.byStatus && summary.byStatus[s]) || 0; });
     return counts;
   },
 
@@ -162,20 +169,4 @@ const CMC_DashboardSheets = {
   },
 
   /** 최근 N건 (접수 최신순) */
-  recentN(recentList, n) {
-    if (!recentList) return CMC_Stats.recent(n);
-    return recentList.slice(0, n);
-  },
-
-  /** 프로그램별 예약 수 (취소 제외) */
-  programBreakdown(recentList) {
-    if (!recentList) return CMC_Stats.programBreakdown();
-    const active = recentList.filter(r => r.status !== '예약취소');
-    const total  = active.length || 1;
-    const programs = (typeof CMC !== 'undefined') ? CMC.PROGRAMS : [];
-    return programs.map(p => {
-      const cnt = active.filter(r => r.program === p.id).length;
-      return { ...p, count: cnt, pct: Math.round(cnt / total * 100) };
-    }).sort((a, b) => b.count - a.count);
-  },
-};
+  recentN(recentList, n)
