@@ -13,44 +13,30 @@
 
 const CMC_CONFIG = {
 
-  /* ── 데이터 소스 모드 ─────────────────────────────────
-   *  'local'        : localStorage 기반 (시제품 기본값)
-   *  'google'       : Apps Script Web App 경유 (운영)
-   * ──────────────────────────────────────────────────── */
-  dataSource: 'local',
+  /* 데이터 소스 모드
+   *  'local'  : localStorage 기반 (시제품)
+   *  'google' : Apps Script Web App 경유 (운영)
+   */
+  dataSource: 'google',
 
-  /* ── Apps Script Web App ────────────────────────────
-   *  Phase 4 핵심: 클라이언트 → Apps Script → Google Sheets
-   *  배포 후 발급되는 URL을 아래에 입력.
-   *  형식: https://script.google.com/macros/s/[SCRIPT_ID]/exec
-   * ──────────────────────────────────────────────────── */
+  /* Apps Script Web App */
   appsScript: {
-    webAppUrl:  '',          // Apps Script 배포 후 발급 URL (필수)
-    sheetName:  '예약현황',  // Google Sheets 시트명
+    webAppUrl:  'https://script.google.com/macros/s/AKfycbzHYWqERR8_hHxzIgCNwvrU8NLtZqu9RVuxezTBWtUKcTleAgcqRhYPX5rnHAM7uCGjng/exec',
+    sheetName:  '예약현황',
     timezone:   'Asia/Seoul',
   },
 
-  /* ── Google Workspace 설정 (직접 API 방식 — Phase 3 호환) ── */
+  /* Google Workspace 설정 */
   google: {
-    /* Google Sheets (직접 API — Apps Script 방식 사용 시 불필요) */
     sheetsId:      '',
     sheetsRange:   '예약현황',
     sheetsVersion: 'v4',
-
-    /* Google Calendar */
     calendarId:    '',
     calendarColor: '#1a4f8a',
-
-    /* Gmail */
     senderEmail:   '',
-    senderName:    '천안의료원 건강검진센터',
-
-    /* 공통 */
+    senderName:    'CMC Health Screening',
     timezone:      'Asia/Seoul',
     locale:        'ko-KR',
-
-    /* OAuth — 클라이언트사이드 사용 시 보안 위험 존재.
-     * Apps Script 방식에서는 이 항목이 필요 없음. */
     clientId:      '',
     apiKey:        '',
     scopes: [
@@ -60,7 +46,7 @@ const CMC_CONFIG = {
     ],
   },
 
-  /* ── 알림 설정 ─────────────────────────────────────── */
+  /* 알림 설정 */
   notifications: {
     emailOnReceive:    true,
     emailOnConfirm:    true,
@@ -69,7 +55,7 @@ const CMC_CONFIG = {
     calendarOnCancel:  true,
   },
 
-  /* ── 병원 기본 정보 ──────────────────────────────────  */
+  /* 병원 기본 정보 */
   hospital: {
     name:    '천안의료원 건강검진센터',
     tel:     '041-570-7777',
@@ -77,10 +63,7 @@ const CMC_CONFIG = {
     url:     '',
   },
 
-  /* ── 설정 저장키 ─────────────────────────────────────── */
   configStorageKey: 'cmc_config_v2',
-
-  /* ── 런타임 메서드 ───────────────────────────────────── */
 
   load() {
     try {
@@ -88,7 +71,7 @@ const CMC_CONFIG = {
       if (saved.dataSource) this.dataSource = saved.dataSource;
       if (saved.appsScript) Object.assign(this.appsScript, saved.appsScript);
       if (saved.google)     Object.assign(this.google, saved.google);
-    } catch { /* 무시 */ }
+    } catch (e) {}
     return this;
   },
 
@@ -109,12 +92,8 @@ const CMC_CONFIG = {
     }));
   },
 
-  setDataSource(mode) {
-    this.dataSource = mode;
-    this.persist();
-  },
-
-  isGoogle()       { return this.dataSource === 'google'; },
-  isLocal()        { return this.dataSource === 'local'; },
-  hasWebAppUrl()   { return !!this.appsScript.webAppUrl; },
+  setDataSource(mode) { this.dataSource = mode; this.persist(); },
+  isGoogle()          { return this.dataSource === 'google'; },
+  isLocal()           { return this.dataSource === 'local'; },
+  hasWebAppUrl()      { return !!this.appsScript.webAppUrl; },
 };
