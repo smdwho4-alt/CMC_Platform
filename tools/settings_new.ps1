@@ -24,7 +24,9 @@ $Script:Settings = @{
     # URL
     HealthUrl            = 'http://127.0.0.1:8600/api/health'
     DashboardUrl         = 'http://127.0.0.1:4000/app/pages/admin_dashboard_new.html'
-    ReservationUrl       = 'http://127.0.0.1:4000/app/pages/reservation_new.html'
+    # [v1.1.0-beta1] Pilot 예약페이지 v3(Rule 기반 선택검사) 전환 — PM 승인 2026-07-12
+    # Rollback: 아래 값을 'http://127.0.0.1:4000/app/pages/reservation_new.html' 로 되돌리면 즉시 v1 복귀
+    ReservationUrl       = 'http://127.0.0.1:4000/app/pages/reservation_v3_new.html'
     AppsScriptUrl        = 'https://script.google.com/macros/s/AKfycbzHYWqERR8_hHxzIgCNwvrU8NLtZqu9RVuxezTBWtUKcTleAgcqRhYPX5rnHAM7uCGjng/exec'
 
     # 폴더 (Toolkit 하위)
