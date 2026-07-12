@@ -4,6 +4,29 @@
 
 ---
 
+## [v1.0.0-pilot] — 2026-07-12
+
+### Added
+- **DEV-003: 관리자 예약관리 Google Sheets Live 연동** (`3288382`)
+  - `admin_reservations_v2_new.html` 신규 (원본 무수정) — 조회/상태변경/메모저장 Live 모드
+  - GAS `_actionUpdateStatus`/`_actionUpdate` LockService 보강
+  - 어댑터 503 오류 메시지 전달 결함 수정 (`google_sheets_service_v2_new.js`)
+  - 테스트 3종 신설: backend 26 / frontend 29 / adapter 5 = 60/60 PASS, Live 응답 1.765초
+- GAS 웹앱 URL 연동 및 운영 모드 전환 (Task #43, `65682ac`)
+- 운영 버전 업데이트 — 리플렛 기준 (Task #44, `dc6bcb9`)
+
+### Fixed
+- **STEP1.5 DateFix 실배포 완료** — GAS Version 5 재배포로 `_actionCreate`/`_rowToObj`/`_actionUpdate`/`_actionSummary` 날짜/시간 포맷 수정 반영 (v0.9.0의 Known Issue 해소)
+- HotFix #1: Dashboard 전체 0 표시 수정 (`b5bb240`)
+- Critical HotFix: FUSE 파일 잘림 복구 + 배포 404 파일 추가 (`cc5803f`)
+- **HotFix #1 유실분 복원** (`353b72f`) — cc5803f 복구 과정에서 `dashboard_sheets_service_new.js`가 HotFix #1 이전 버전으로 회귀해 커밋된 HTML(2-인자 `statusCounts` 호출)과 불일치했던 것을 복구. 신규 기능 아님, HEAD/HTML 정합성 복구 목적
+
+### Notes
+- Known Limitations: `reservation_v2_new.html` 실브라우저 QA 미완(파일 무수정, 회귀 위험 낮음), LockService 실동시성(503) 미검증, `CMC_CONFIG.load()` 모드전환 롤백 결함(별도 티켓 task_a8cf5790), 관리자 인증·HTTPS 미적용(파일럿 허용, 정식 운영 전 필수)
+- Pilot 운영 가능 수준 확인 (DEV-003 검증 60/60 PASS 기준)
+
+---
+
 ## [v0.9.0-pilot] — 2026-07-04
 
 ### Added
@@ -93,4 +116,4 @@
 | Phase 4 | Google Apps Script Web App 경유 연동으로 전환 (18컬럼 예약DB) |
 | Phase 4.5 | 예약 시트 29컬럼으로 확장(접수·검진·결제·결과), ERD/워크플로우 문서화 |
 | STEP0-1 | 예약 쓰기 경로 배선 및 검증 완료 |
-| STEP1.5 | DateFix QA — 날짜/시간 포맷 결함 발견, 수정 코드 작성 (배포는 미반영, 현재도 유효한 Known Issue) |
+| STEP1.5 | DateFix QA — 날짜/시간 포맷 결함 발견, 수정 코드 작성 (v1.0.0-pilot에서 GAS Version 5 재배포로 해소) |

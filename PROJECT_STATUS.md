@@ -2,15 +2,15 @@
 
 > 이 문서는 프로젝트의 **현재 시점 상태 스냅샷**이다. 최신 정보를 유지하는 것이 원칙이며, 상태가 바뀔 때마다 갱신한다.
 
-**최종 갱신**: 2026-07-12 (DEV-003 구현 완료 반영)
-**버전**: v0.9.0-pilot (릴리스 상세: [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md), 최종 검토: [PILOT_READINESS_REVIEW.md](PILOT_READINESS_REVIEW.md))
-**단계**: Sprint A~I + Sprint 2(Dashboard v3) 완료 → **Architecture Freeze(Sprint 0) 완료** → **구조 Freeze(v0.9.0 기준) 확정** → **Pilot Ready 미충족 (준비 중)**
+**최종 갱신**: 2026-07-12 (v1.0.0-pilot 릴리스 반영)
+**버전**: v1.0.0-pilot (릴리스 상세: [RELEASE_REPORT_v1.0.0-pilot_new.md](RELEASE_REPORT_v1.0.0-pilot_new.md), 이전 릴리스: [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md))
+**단계**: Sprint A~I + Sprint 2(Dashboard v3) + DEV-003 완료 → **Architecture Freeze(Sprint 0) 완료** → **구조 Freeze(v0.9.0 기준) 유지** → **Pilot 운영 가능 (조건부 Pilot Ready — 잔여 Follow-up 3건은 §2-1 참조)**
 
 > **Architecture Freeze**와 **Pilot Ready(운영 파일럿 투입 가능 여부)**는 서로 다른 개념으로 별도 관리한다. Architecture Freeze는 설계·구조·표준 문서의 확정이며, 미해결 버그 존재와 무관하게 완료될 수 있다(DECISIONS.md ADR-010). Pilot Ready는 아래 §2의 Known Issues가 모두 해소되어야 충족된다.
 
 > **프로젝트 구조는 v0.9.0 현재 상태로 Freeze되었다.** 구조 변경 작업은 중단하고 Pilot 종료 후 v1.0 작업으로 이관한다(DECISIONS.md ADR-011). 구조 관련 기준 문서는 [docs/STRUCTURE_REORG_ANALYSIS_new.md](docs/STRUCTURE_REORG_ANALYSIS_new.md)이다.
 
-**현재 최우선 작업 순서**: ① STEP1.5 DateFix → ② 전체 QA → ③ v0.9.0 Pilot Release (ROADMAP.md 참조)
+**현재 최우선 작업 순서**: ~~① STEP1.5 DateFix → ② 전체 QA → ③ Pilot Release~~ **완료 (v1.0.0-pilot 태그)** → 다음: Pilot 운영 + Follow-up 3건(§2-1) 해소
 
 ---
 
@@ -24,16 +24,23 @@
 | AI 금지응답 테스트 | ✅ 35/35 차단 |
 | 백업·복구 리허설 | ✅ 9/9 PASS |
 | **Architecture Freeze (Sprint 0)** | ✅ **완료** (SSOT 문서 5종 확정) |
-| **Pilot Ready** | 🔴 **미충족** — Known Issues §2 해결 후 재평가 |
+| **Pilot Ready** | 🟢 **조건부 충족 (v1.0.0-pilot)** — 차단 이슈 해소, 잔여 Follow-up 3건은 §2-1 |
 | STEP1.5 DateFix 코드 수정 | ✅ **완료** (`_actionUpdate`/`_actionSummary` 하드닝 포함, 회귀 테스트 150건 FAIL 0) — [STEP1.5.2_DateFix_Complete_new.md](STEP1.5.2_DateFix_Complete_new.md) |
-| STEP1.5 DateFix 실배포 | 🔴 **미반영 — 사용자 조치 필요** (Apps Script는 이 세션에서 배포 불가) |
-| DEV-003 (관리자 예약관리 Sheets연동) | ✅ 구현+테스트 완료(60/60 PASS), Lock 재배포 대기 — Subagent-Driven Development로 구현, Architecture Freeze 준수 확인(신규 파일/폴더 구조 변경 없음, 지정된 파일만 최소 수정) |
+| STEP1.5 DateFix 실배포 | ✅ **완료** — GAS Version 5 재배포 (2026-07-12, 사용자 수행), DEV-003 Live 검증으로 간접 확인 |
+| DEV-003 (관리자 예약관리 Sheets연동) | ✅ **완료** — 구현+테스트 60/60 PASS, Live 검증 완료(조회/상태변경/메모저장/새로고침유지/원복 PASS, 응답 1.765초) |
+| HotFix#1 유실분 복원 (`353b72f`) | ✅ **완료** — cc5803f FUSE 복구 시 회귀했던 dashboard 서비스를 커밋된 HTML과 정합하도록 복원 |
+| v1.0.0-pilot 태그 | ✅ 생성·push 완료 (2026-07-12) |
 
 ---
 
-## 2. Known Issues (Pilot Ready 차단 요인)
+## 2. Known Issues
 
-### 🟡 STEP1.5 DateFix — 코드 수정 완료, 실배포 대기 (2026-07-04 갱신)
+### ✅ STEP1.5 DateFix — 해소 (2026-07-12, GAS Version 5 재배포)
+
+**해소됨.** 사용자가 Apps Script "새 버전" 재배포(Version 5)를 완료했고, DEV-003 Live 검증(조회/상태변경/메모저장 PASS)으로 배포 반영이 확인됐다. 아래는 이력 보존용 기록.
+
+<details>
+<summary>이력 (2026-07-04 이전 기록)</summary>
 
 - **발견**: 2026-07-01, QA 검증 (`STEP1.5_create_QA결과_new.md`)
 - **증상**: Google Sheets 자동 Date 변환으로 인해
@@ -53,6 +60,8 @@
 - **Pilot Ready를 막는가?**: 예 — 운영 데이터 정합성 문제이므로 실배포 + 실사이트 재QA 전까지 Pilot Ready 판정 불가. ROADMAP.md "Sprint J 이전 필수 해결 과제" 및 "구조 Freeze 및 최우선 작업 순서" 참조.
 - **잔존 리스크**: 기존 QA 더미(`20260701-0001~0004`)는 셀이 이미 Date로 손상되어 있어 이번 수정으로 자동 치유되지 않음(더미 정리로 해결 예정). 상세: STEP1.5.2 문서 §5.
 
+</details>
+
 ---
 
 ## 2-1. DEV-003 완료 (2026-07-12) — 관리자 예약관리 Sheets Live 연동
@@ -63,14 +72,15 @@
 - **테스트**: 신규 3개 스위트 60/60 PASS(`tests/run_dev003_backend_qa.js` 26건, `tests/run_dev003_frontend_qa.js` 29건, `tests/run_dev003_adapter_error_qa.js` 5건). LOCAL 모드 브라우저 QA 통과, 원본 화면 회귀 없음.
 - **DEV-003_..._Design_Final_new.md §11 QA Checklist**: 20개 항목 중 14개 완료, 1개 부분(간접) 확인, 5개는 아래 Release Checklist 항목에 의존해 대기.
 
-### Release Checklist (Pilot Ready 전 필수, DEV-003 커밋 범위 밖)
+### Release Checklist 결과 (v1.0.0-pilot 기준, 2026-07-12)
 
-| # | 항목 | 비고 |
+| # | 항목 | 결과 |
 |---|------|------|
-| 1 | Google Apps Script(`sheets_api_v3_final.gs`) 재배포 — "새 버전" | STEP1.5 DateFix + DEV-003 Lock 보강 동시 반영됨. 사용자 조치 필요(Google 계정 인증 필요, 이 세션에서 불가) |
-| 2 | Live 모드 API 응답시간 실측(NFR 기준 3초 이내) | 재배포 후 실측 |
-| 3 | `reservation_v2_new.html` 실제 브라우저 QA | 이번 세션 도구(스크린샷) 장애로 미완, 파일 자체는 무수정 확인됨(회귀 위험 낮음) |
-| 4 | `CMC_CONFIG.load()` 미호출 — 모드전환 롤백 미작동 | Follow-up 세션 진행 중(task_a8cf5790). DEV-003 발견이나 이 폴더 전체(원본 페이지 포함)에 적용되는 기존 결함이라 별도 티켓으로 분리 |
+| 1 | Google Apps Script(`sheets_api_v3_final.gs`) 재배포 — "새 버전" | ✅ 완료 (Version 5, 사용자 수행) |
+| 2 | Live 모드 API 응답시간 실측(NFR 기준 3초 이내) | ✅ 1.765초 (충족) |
+| 3 | `reservation_v2_new.html` 실제 브라우저 QA | 🔲 **Follow-up #1** — 파일 무수정 확인됨(회귀 위험 낮음), Pilot 초기 병행 수행 |
+| 4 | LockService 실동시성(503) 검증 | 🔲 **Follow-up #2** — Pilot 중 동시 접속 낮아 영향 제한적 |
+| 5 | `CMC_CONFIG.load()` 미호출 — 모드전환 롤백 미작동 | 🔲 **Follow-up #3** — 별도 세션 진행 중(task_a8cf5790). 기존 결함으로 별도 티켓 분리 |
 
 ---
 
@@ -78,7 +88,7 @@
 
 | 항목 | 상태 | 비고 |
 |---|---|---|
-| `admin_reservations_v2_new.html` (DEV-003 구현) | ✅ 완료, Lock 재배포만 대기 | §2-1 Release Checklist 참조 |
+| `admin_reservations_v2_new.html` (DEV-003 구현) | ✅ 완료 (Live 검증 포함) | §2-1 Release Checklist 참조 |
 | 더미 예약 데이터 정리 | 파일럿 1주차 허용 | `data/reservations.json` 중 QA 더미 |
 | 더미 계정 정리 (USR-0001~0003) | WARN, 운영 전 정리 필요 | `data/users.json` |
 | LLM 기반 의도 분류 전환 | 규칙 기반이 기본, Claude API는 Key 설정 시만 | `agent_orchestrator.py` 교체 지점 주석 있음 |
