@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>예약신청(v3·Rule기반 선택검사) | CMC Health Screening Platform</title>
+  <link rel="stylesheet" href="../styles/main_style_new.css">
+  <style>
+    /* ── v3 선택검사 Rule UI 전용 스타일 (페이지 로컬) ── */
+    .sel-group { border: 1px solid var(--gray-200, #e0e0e0); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+    .sel-group-header { display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+                        background: var(--gray-50, #fafafa); border-bottom: 1px solid var(--gray-200, #e0e0e0); }
+    .sel-group-title { font-weight: 800; font-size: 15px; }
+    .sel-group-guide { font-size: 13px; color: var(--gray-500, #757575); }
+    .sel-count-badge { margin-left: auto; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+                       background: #eceff1; color: #546e7a; white-space: nowrap; }
+    .sel-count-badge.ok   { background: #e8f5e9; color: #2e7d32; }
+    .sel-count-badge.over { background: #ffebee; color: #c62828; }
+    .sel-group-body { padding: 12px 14px; }
+    .sel-item-note { display: block; font-size: 11px; color: var(--gray-500, #9e9e9e); margin-top: 2px; }
+    .optional-item.disabled { opacity: .45; pointer-events: none; }
+    .sel-msg { font-size: 12.5px; color: #c62828; padding: 6px 14px 10px; display: none; }
+    .sel-msg.show { display: block; }
+    .ai-badge { display: inline-block; font-size: 10.5px; font-weight: 800; color: #6a1b9a; background: #f3e5f5;
+                border-radius: 10px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; }
+    .ai-reason { font-size: 11.5px; color: #6a1b9a; margin-top: 2px; }
+    .sel-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px;
+                   background: var(--gray-50, #f5f7fa); border: 1px dashed var(--gray-300, #cfd8dc);
+                   border-radius: 10px; padding: 10px 14px; font-size: 13.5px; }
+    .sel-summary .price { font-weight: 800; font-size: 15px; color: var(--primary, #1565c0); }
+    .sel-notes { margin-top: 10px; font-size: 12px; color: var(--gray-500, #757575); line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<!--
+  reservation_v3_new.html — 선택검사 Rule 기반 UI 전면 개편판
+  ────────────────────────────────────────────────────────────────
+  · 원본 reservation_new.html / v2(Live배선)는 보존. 본 파일은 v2 사본 + STEP4 교체.
+  · STEP 4 선택검사: 전체 체크박스 나열 방식 제거 →
+      프로그램 선택 → Rule Loading(checkup_rules_new.js) → 그룹/선택개수 표시
+      → 선택 Rule 적용(초과 차단) → 추천 Badge 영역 → 견적(프로그램 가격) 표시
+  · Rule SSOT: 2025.12.24 리플렛 → app/data/checkup_rules_new.js (UI 하드코딩 없음)
+  · 저장 로직(local/google)은 v2와 동일 — 변경 없음.
+-->
+
+<main class="page-wrap" style="margin-top:0;padding-top:22px;max-width:800px">
+
+  <div class="page-header">
+    <div class="page-title">📋 종합건강검진 예약신청</div>
+    <div class="page-date">전화·방문·홈페이지 예약 가능 | 예약 확정은 해피콜 이후 안내드립니다</div>
+  </div>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">ℹ️</span>
+    <div>문의: <strong>041-570-7333</strong> (검진센터 직통) | 평일 08:00~17:00</div>
+  </div>
+
+  <div id="formWrap">
+    <form id="reservationForm" novalidate>
+
+      <!-- STEP 1 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">1</span><h2>기본 정보</h2></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group"><label>성명 <span class="required">*</span></label><input type="text" id="name" placeholder="홍길동" maxlength="20" autocomplete="name"></div>
+            <div class="form-group"><label>생년월일 <span class="required">*</span></label><input type="date" id="birth" min="1920-01-01" max="2020-12-31"></div>
+            <div class="form-group"><label>연락처 <span class="required">*</span></label><input type="tel" id="phone" placeholder="010-0000-0000" maxlength="13" autocomplete="tel"></div>
+            <div class="form-group">
+              <label>성별 <span class="required">*</span></label>
+              <div class="radio-group" id="genderGroup">
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>남성</span></label>
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>여성</span></label>
+              </div>
+            </div>
+            <div class="form-group"><label>사업장명</label><input type="text" id="company" placeholder="회사명 또는 기관명" maxlength="50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">2</span><h2>검진 프로그램 <span class="required">*</span></h2></div>
+        <div class="card-body">
+          <div class="alert alert-info" style="margin-bottom:14px"><span class="alert-icon">💡</span><div>3.0T MRI 포함 정밀 검진: <strong>VIP·PREMIUM</strong></div></div>
+          <div class="program-grid" id="programGrid"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">3</span><h2>희망 일정</h2></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group"><label>희망 검진일 <span class="required">*</span></label><input type="date" id="wishDate"></div>
+            <div class="form-group">
+              <label>수면 검진</label>
+              <div class="radio-group" id="sleepGroup">
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>일반</span></label>
+                <label class="radio-item"><input type="radio"><span class="radio-dot"></span><span>💤 수면</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:16px">
+            <label>희망 시간 <span class="required">*</span></label>
+            <div class="radio-group" id="timeSlots" style="margin-top:6px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 : Rule 기반 선택검사 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">4</span><h2>선택 검사</h2></div>
+        <div class="card-body">
+          <div id="selectionArea"></div>
+        </div>
+      </div>
+
+      <!-- STEP 5 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><span class="step-badge" style="background:var(--primary);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">5</span><h2>특이사항 및 동의</h2></div>
+        <div class="card-body">
+          <div class="form-group" style="margin-bottom:18px">
+            <label>특이사항 (알레르기·복용약·과거력 등)</label>
+            <textarea id="note" placeholder="의료진이 알아야 할 사항을 입력해 주세요."></textarea>
+          </div>
+          <div class="privacy-box">
+            <h4>개인정보 수집·이용 동의</h4>
+            <p><strong>수집항목:</strong> 성명, 생년월일, 연락처, 성별, 사업장명, 검진 관련 정보</p>
+            <p><strong>목적:</strong> 검진 예약 접수, 일정 안내, 결과 통보</p>
+            <p><strong>보유기간:</strong> 검진 완료 후 5년 (의료법 제22조)</p>
+            <p style="color:#c62828;margin-top:6px">※ v1.0 시제품 — 실제 운영 시 보안 서버 전환 필요</p>
+          </div>
+          <label class="privacy-agree"><input type="checkbox" id="privacyAgree"> 개인정보 수집·이용에 동의합니다 <span class="required">*</span></label>
+        </div>
+      </div>
+
+      <div style="text-align:center">
+        <button type="submit" class="btn btn-primary btn-lg" style="max-width:420px">📋 예약 신청하기</button>
+        <p style="margin-top:10px;font-size:13px;color:var(--gray-500)">예약 확정은 해피콜(전화 확인) 이후에 가능합니다</p>
+      </div>
+    </form>
+  </div>
+
+  <!-- 완료 화면 -->
+  <div id="successScreen" style="display:none">
+    <div class="card"><div class="card-body success-screen">
+      <div class="success-icon">✅</div>
+      <div class="success-title">예약 신청 완료!</div>
+      <div class="success-sub">예약 확정은 <strong>해피콜(전화 확인)</strong> 이후에 안내드립니다.</div>
+      <div class="reservation-number-box">
+        <div class="label">예약번호</div>
+        <div class="number" id="successNo">-</div>
+      </div>
+      <div style="margin-bottom:22px;background:var(--gray-50);border-radius:8px;padding:14px 20px;text-align:left;display:inline-block">
+        <table style="font-size:15px;border-collapse:collapse">
+          <tr><td style="color:var(--gray-500);padding:4px 8px;width:80px">신청자</td><td id="successName" style="font-weight:700;padding:4px 8px"></td></tr>
+          <tr><td style="color:var(--gray-500);padding:4px 8px">검진일시</td><td id="successDate" style="font-weight:700;padding:4px 8px"></td></tr>
+          <tr><td style="color:var(--gray-500);padding:4px 8px">프로그램</td><td id="successProg" style="font-weight:700;padding:4px 8px"></td></tr>
+        </table>
+      </div>
+      <div class="btn-group center">
+        <button class="btn btn-outline" onclick="location.reload()">새 예약 신청</button>
+        <a href="admin_dashboard_new.html" class="btn btn-secondary">대시보드</a>
+      </div>
+    </div></div>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <strong>천안의료원 건강검진센터</strong><br>
+  <span style="font-size:12px;opacity:.6">CMC Health Screening Platform v1.0 | 041-570-7333</span>
+</footer>
+
+<!-- 데이터/유틸 (v2와 동일) -->
+<script src="../data/programs_data_new.js"></script>
+<script src="../data/sample_data_new.js"></script>
+<script src="../services/db_service_new.js"></script>
+<!-- v2 배선: 설정(local/google 스위치) + Apps Script 어댑터 -->
+<script src="../config_v2_new.js"></script>
+<script src="../services/google_sheets_service_v2_new.js"></script>
+<script src="../services/stats_service_new.js"></script>
+<script src="../components/nav_new.js"></script>
+<!-- ★ v3 추가: 선택검사 Rule (SSOT: 2025.12.24 리플렛) -->
+<script src="../data/checkup_rules_new.js"></script>
+<script>
+'use strict';
+const RF = {
+  selectedProg: null,
+  /* 그룹별 선택 상태: { A: Set(itemId), B: Set(itemId), ... } */
+  groupSel: {},
+
+  _cfg() { return (typeof CMC_CONFIG !== 'undefined') ? CMC_CONFIG : null; },
+
+  init() {
+    const cfg = this._cfg();
+    if (cfg && typeof cfg.load === 'function') cfg.load();
+    this._logMode();
+
+    CMC_DB.initSampleIfEmpty();
+    CMC_Nav.render('reservation');
+    this.renderProgs(); this.renderSelection(); this.renderTimes(); this.bindEvents();
+    const d = new Date(); d.setDate(d.getDate()+1);
+    document.getElementById('wishDate').min = d.toISOString().split('T')[0];
+  },
+
+  _isLive() {
+    const cfg = this._cfg();
+    return !!(cfg && typeof cfg.isGoogle === 'function' && cfg.isGoogle());
+  },
+  _logMode() {
+    const cfg  = this._cfg();
+    const live = this._isLive();
+    const url  = (cfg && cfg.appsScript) ? (cfg.appsScript.webAppUrl || '(미설정)') : '(config 없음)';
+    console.log(`%c[reservation_v3] 저장 모드: ${live ? 'LIVE (Google Sheets)' : 'LOCAL (localStorage)'}`,
+                `color:${live ? '#2e7d32' : '#1565c0'};font-weight:700`);
+    console.log('[reservation_v3] dataSource =', cfg ? cfg.dataSource : 'N/A', '| webAppUrl =', url);
+    console.log('[reservation_v3] 선택검사 Rule =', CMC_CHECKUP_RULES.version, '(', CMC_CHECKUP_RULES.source, ')');
+  },
+
+  renderProgs() {
+    const badgeMap = { BASIC:'badge-basic', SMART:'badge-smart', VIP:'badge-vip', PREMIUM:'badge-premium', YOUNG:'badge-young', '온김에검진':'badge-on' };
+    document.getElementById('programGrid').innerHTML = CMC.PROGRAMS.map(p =>
+      `<div class="program-card" data-id="${p.id}" onclick="RF.selectProg('${p.id}')">
+         <span class="program-badge ${badgeMap[p.id]||''}">${p.id}</span>
+         <div class="program-name">${p.name}</div>
+         <div class="program-price">${p.price}</div>
+         <div class="program-desc">${p.desc}</div>
+       </div>`).join('');
+  },
+
+  selectProg(id) {
+    if (this.selectedProg === id) return;
+    this.selectedProg = id;
+    document.querySelectorAll('.program-card').forEach(e => e.classList.toggle('selected', e.dataset.id === id));
+    /* 프로그램 변경 → Rule Loading → 선택 초기화 후 다시 렌더 */
+    this.groupSel = {};
+    this.renderSelection();
+  },
+
+  getGender() { return this.getRadio('genderGroup'); },
+
+  /* ══════════ STEP 4 : Rule 기반 렌더링 ══════════
+     Rule(checkup_rules_new.js)만 읽어서 그린다 — 프로그램/그룹/항목/개수 하드코딩 없음 */
+  renderSelection() {
+    const area = document.getElementById('selectionArea');
+    const R = CMC_CHECKUP_RULES;
+
+    if (!this.selectedProg) {
+      area.innerHTML = `<div class="alert alert-info"><span class="alert-icon">☝️</span>
+        <div>STEP 2에서 <strong>검진 프로그램을 먼저 선택</strong>하시면 프로그램별 선택검사 항목이 표시됩니다.</div></div>`;
+      return;
+    }
+
+    const rule = R.getProgram(this.selectedProg);
+    if (!rule) {
+      area.innerHTML = `<div class="alert alert-info"><span class="alert-icon">ℹ️</span>
+        <div><strong>${CMC.esc(this.selectedProg)}</strong> 프로그램은 별도 선택검사 없이 구성된 프로그램입니다.</div></div>`;
+      return;
+    }
+
+    const gender = this.getGender();
+    const html = rule.groups.map(g => {
+      if (!this.groupSel[g.id]) this.groupSel[g.id] = new Set();
+      const sel = this.groupSel[g.id];
+      const itemsHtml = g.items.map(itemId => {
+        const it = R.getItem(itemId);
+        if (!it) return '';
+        const checked = sel.has(itemId);
+        const genderBlocked = !!(it.restriction && it.restriction.gender && gender && it.restriction.gender !== gender);
+        const badge  = it.recommended ? `<span class="ai-badge">★ AI 추천</span>` : '';
+        const reason = (it.recommended && it.recommendReason) ? `<span class="ai-reason">${CMC.esc(it.recommendReason)}</span>` : '';
+        const note   = it.note ? `<span class="sel-item-note">${CMC.esc(it.note)}</span>` : '';
+        return `<div class="optional-item ${checked?'selected':''} ${genderBlocked?'disabled':''}"
+                     data-g="${g.id}" data-i="${itemId}" title="${genderBlocked ? it.restriction.gender+' 전용 검사입니다' : ''}">
+                  <span class="optional-check"></span>
+                  <span>${CMC.esc(it.label)}${badge}${note}${reason}</span>
+                </div>`;
+      }).join('');
+      return `<div class="sel-group" data-group="${g.id}">
+        <div class="sel-group-header">
+          <span class="sel-group-title">${CMC.esc(g.name)}</span>
+          <span class="sel-group-guide">${CMC.esc(g.name)}에서 <strong>${g.count}개</strong> 선택</span>
+          <span class="sel-count-badge" id="selCount_${g.id}">0/${g.count}</span>
+        </div>
+        <div class="sel-group-body"><div class="optional-grid">${itemsHtml}</div></div>
+        <div class="sel-msg" id="selMsg_${g.id}"></div>
+      </div>`;
+    }).join('');
+
+    /* 견적 요약(가격 표시 Rule) + 공통 안내 */
+    let summary = '';
+    if (rule.pricing && rule.pricing.display) {
+      const price = gender === '남성' ? rule.pricing.male : gender === '여성' ? rule.pricing.female : `${rule.pricing.male}(남) / ${rule.pricing.female}(여)`;
+      summary = `<div class="sel-summary">💰 <strong>${CMC.esc(this.selectedProg)}</strong> 검진 비용:
+                   <span class="price">${CMC.esc(price)}</span>
+                   <span style="color:var(--gray-500);font-size:12px">(선택검사 포함가 — 리플렛 ${CMC.esc(CMC_CHECKUP_RULES.version)} 기준)</span>
+                 </div>`;
+    }
+    const notes = `<div class="sel-notes">${CMC_CHECKUP_RULES.commonNotes.map(n => '※ ' + CMC.esc(n)).join('<br>')}</div>`;
+
+    area.innerHTML = html + summary + notes;
+    rule.groups.forEach(g => this._updateGroupBadge(g));
+
+    /* 이벤트 위임 (렌더 후 1회 바인딩) */
+    area.querySelectorAll('.optional-item').forEach(el =>
+      el.addEventListener('click', () => this.toggleItem(el.dataset.g, el.dataset.i, el)));
+  },
+
+  toggleItem(groupId, itemId, el) {
+    const rule = CMC_CHECKUP_RULES.getProgram(this.selectedProg);
+    if (!rule) return;
+    const g = rule.groups.find(x => x.id === groupId);
+    if (!g) return;
+    const sel = this.groupSel[groupId];
+    const msg = document.getElementById('selMsg_' + groupId);
+
+    if (sel.has(itemId)) {
+      sel.delete(itemId);
+      el.classList.remove('selected');
+      this._showMsg(msg, '');
+    } else {
+      /* 선택 Rule 적용: 개수 초과 차단 */
+      if (sel.size >= g.count) {
+        this._showMsg(msg, `⚠️ ${g.name}은 최대 ${g.count}개까지 선택할 수 있습니다. 다른 항목을 해제한 후 선택해 주세요.`);
+        return;
+      }
+      sel.add(itemId);
+      el.classList.add('selected');
+      this._showMsg(msg, '');
+    }
+    this._updateGroupBadge(g);
+  },
+
+  _showMsg(msgEl, text) {
+    if (!msgEl) return;
+    msgEl.textContent = text;
+    msgEl.classList.toggle('show', !!text);
+  },
+
+  _updateGroupBadge(g) {
+    const badge = document.getElementById('selCount_' + g.id);
+    if (!badge) return;
+    const n = (this.groupSel[g.id] || new Set()).size;
+    badge.textContent = `${n}/${g.count}`;
+    badge.classList.toggle('ok', n === g.count);
+    badge.classList.toggle('over', n > g.count);
+  },
+
+  renderTimes() {
+    document.getElementById('timeSlots').innerHTML = CMC.TIME_SLOTS.map(t =>
+      `<div class="radio-item" data-t="${t}" onclick="RF.selectTime('${t}')">
+         <span class="radio-dot"></span><span>${t}</span></div>`).join('');
+  },
+  selectTime(t) {
+    document.querySelectorAll('#timeSlots .radio-item').forEach(e => e.classList.toggle('selected', e.dataset.t === t));
+  },
+
+  bindEvents() {
+    ['genderGroup','sleepGroup'].forEach(gid => {
+      document.querySelectorAll(`#${gid} .radio-item`).forEach(el =>
+        el.addEventListener('click', () => {
+          document.querySelectorAll(`#${gid} .radio-item`).forEach(e => e.classList.remove('selected'));
+          el.classList.add('selected');
+          /* 성별 변경 → 성별 제한/가격 표시 갱신 (선택 상태는 유지, 제한 위반은 아래에서 정리) */
+          if (gid === 'genderGroup') this._applyGenderRule();
+        }));
+    });
+    document.getElementById('reservationForm').addEventListener('submit', e => { e.preventDefault(); this.submit(); });
+  },
+
+  /* 성별 변경 시: Rule의 gender 제한 위반 항목은 선택 해제 후 재렌더 */
+  _applyGenderRule() {
+    const rule = CMC_CHECKUP_RULES.getProgram(this.selectedProg);
+    const gender = this.getGender();
+    if (rule && gender) {
+      rule.groups.forEach(g => {
+        const sel = this.groupSel[g.id];
+        if (!sel) return;
+        [...sel].forEach(itemId => {
+          const it = CMC_CHECKUP_RULES.getItem(itemId);
+          if (it && it.restriction && it.restriction.gender && it.restriction.gender !== gender) sel.delete(itemId);
+        });
+      });
+    }
+    this.renderSelection();
+  },
+
+  getField(id) { return (document.getElementById(id)?.value||'').trim(); },
+  getRadio(gid) { return document.querySelector(`#${gid} .radio-item.selected span:last-child`)?.textContent.trim() || ''; },
+  getTime()     { return document.querySelector('#timeSlots .radio-item.selected')?.dataset.t || ''; },
+
+  validate() {
+    const e = [];
+    if (!this.getField('name'))     e.push('성명을 입력해 주세요.');
+    if (!this.getField('birth'))    e.push('생년월일을 선택해 주세요.');
+    if (!this.getField('phone'))    e.push('연락처를 입력해 주세요.');
+    if (!this.getRadio('genderGroup')) e.push('성별을 선택해 주세요.');
+    if (!this.selectedProg)         e.push('검진 프로그램을 선택해 주세요.');
+    if (!this.getField('wishDate')) e.push('희망 검진일을 선택해 주세요.');
+    if (!this.getTime())            e.push('희망 시간을 선택해 주세요.');
+    if (!document.getElementById('privacyAgree').checked) e.push('개인정보 동의가 필요합니다.');
+
+    /* ── 선택검사 Rule Validation (부족: 진행 불가 / 초과: 저장 불가) ── */
+    const rule = CMC_CHECKUP_RULES.getProgram(this.selectedProg);
+    if (rule) {
+      const gender = this.getGender();
+      rule.groups.forEach(g => {
+        const n = (this.groupSel[g.id] || new Set()).size;
+        if (n < g.count) e.push(`[선택검사] ${g.name}에서 ${g.count}개를 선택해 주세요. (현재 ${n}개)`);
+        if (n > g.count) e.push(`[선택검사] ${g.name} 선택이 ${g.count}개를 초과했습니다. (현재 ${n}개)`);
+        (this.groupSel[g.id] || new Set()).forEach(itemId => {
+          const it = CMC_CHECKUP_RULES.getItem(itemId);
+          if (it && it.restriction && it.restriction.gender && gender && it.restriction.gender !== gender) {
+            e.push(`[선택검사] '${it.label}'은(는) ${it.restriction.gender} 전용 검사입니다.`);
+          }
+        });
+      });
+    }
+    return e;
+  },
+
+  /* 선택검사 → 저장용 라벨 배열 (그룹 표기 포함, 기존 optionalTests 필드 그대로 사용) */
+  _collectTests() {
+    const rule = CMC_CHECKUP_RULES.getProgram(this.selectedProg);
+    if (!rule) return [];
+    const out = [];
+    rule.groups.forEach(g => {
+      (this.groupSel[g.id] || new Set()).forEach(itemId => {
+        const it = CMC_CHECKUP_RULES.getItem(itemId);
+        if (it) out.push(`[${g.id}] ${it.label}`);
+      });
+    });
+    return out;
+  },
+
+  _buildReservation() {
+    return {
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      status: '예약접수', name: this.getField('name'), birth: this.getField('birth'),
+      phone: this.getField('phone'), gender: this.getRadio('genderGroup'),
+      program: this.selectedProg, wishDate: this.getField('wishDate'), wishTime: this.getTime(),
+      sleep: this.getRadio('sleepGroup') || '일반', optionalTests: this._collectTests(),
+      company: this.getField('company'), note: this.getField('note'),
+    };
+  },
+
+  async submit() {
+    const errors = this.validate();
+    if (errors.length) { alert('입력 확인\n\n' + errors.join('\n')); return; }
+
+    const btn = document.querySelector('#reservationForm button[type="submit"]');
+    const r   = this._buildReservation();
+    let no    = null;
+
+    try {
+      if (this._isLive()) {
+        if (!CMC_CONFIG.hasWebAppUrl()) {
+          alert('예약 저장 실패\n\nLive 모드이지만 Apps Script Web App URL이 설정되지 않았습니다.\n관리자에게 문의해 주세요.');
+          return;
+        }
+        if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+        const res = await CMC_SheetsServiceV2.create(r);
+        console.log('[예약저장:LIVE] 응답 →', res);
+        if (!res || !res.ok) {
+          alert('예약 저장 실패 (서버)\n\n' + ((res && res.error) || '알 수 없는 오류') +
+                '\n\n잠시 후 다시 시도하거나 041-570-7333로 문의해 주세요.');
+          return;
+        }
+        no = (res.data && res.data.reservationNo) || '';
+      } else {
+        r.reservationNo = CMC_DB.generateNo();
+        CMC_DB.add(r);
+        no = r.reservationNo;
+        console.log('[예약저장:LOCAL] 저장 완료 →', r);
+      }
+    } catch (e) {
+      console.error('[예약저장] 예외 →', e);
+      alert('예약 저장 중 오류가 발생했습니다.\n\n' + (e && e.message ? e.message : e) +
+            '\n\n네트워크 상태를 확인하거나 041-570-7333로 문의해 주세요.');
+      return;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '📋 예약 신청하기'; }
+    }
+
+    document.getElementById('formWrap').style.display = 'none';
+    document.getElementById('successScreen').style.display = 'block';
+    document.getElementById('successNo').textContent   = no || '(번호 확인 필요)';
+    document.getElementById('successName').textContent = r.name;
+    document.getElementById('successDate').textContent = `${r.wishDate} (${r.wishTime})`;
+    document.getElementById('successProg').textContent = r.program;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+};
+document.addEventListener('DOMContentLoaded', () => RF.init());
+</script>
+</body>
+</html>
