@@ -1,10 +1,10 @@
 name,pass,detail
-"사전준비: create 성공",true,"{""ok"":true,""message"":""예약 등록 완료"",""data"":{""reservationNo"":""20260712-0001"",""createdAt"":""2026-07-12 13:03:34""}}"
+"사전준비: create 성공",true,"{""ok"":true,""message"":""예약 등록 완료"",""data"":{""reservationNo"":""20260712-0001"",""createdAt"":""2026-07-12 14:02:34""}}"
 "updateStatus: 정상 성공",true,"{""ok"":true,""message"":""상태 변경 완료"",""data"":{""reservationNo"":""20260712-0001"",""status"":""예약확정""}}"
 "updateStatus: Lock 1회 획득",true,"acquireCount=2"
 "updateStatus: Lock 1회 해제",true,"releaseCount=2"
 "updateStatus: 시트에 상태 반영됨",true,"예약확정"
-"updateStatus: 예약확정일 자동 기록됨(회귀)",true,"2026-07-12 13:03:34"
+"updateStatus: 예약확정일 자동 기록됨(회귀)",true,"2026-07-12 14:02:34"
 "updateStatus: Lock 실패 시 503 반환",true,"{""ok"":false,""error"":""동시 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."",""code"":503}"
 "updateStatus: Lock 실패 시 acquireCount 불변",true,"acquireCount=2"
 "updateStatus: Lock 실패 시 releaseLock 호출 안 됨(획득한 적 없으므로)",true,"releaseCount=2"
