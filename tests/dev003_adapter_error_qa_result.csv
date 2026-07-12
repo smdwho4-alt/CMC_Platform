@@ -1,0 +1,6 @@
+name,pass,detail
+"_liveUpdateStatus: 실패 시 error 문자열이 전달됨",true,"{""ok"":false,""source"":""google"",""error"":""동시 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.""}"
+"_liveUpdateStatus: ok가 false로 전달됨",true,"{""ok"":false,""source"":""google"",""error"":""동시 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.""}"
+"_liveUpdate: 실패 시 error 문자열이 전달됨",true,"{""ok"":false,""source"":""google"",""error"":""동시 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.""}"
+"_liveUpdateStatus: 성공 시 error는 undefined(불필요한 필드 없음)",true,"{""ok"":true,""data"":{""reservationNo"":""20260810-0001"",""status"":""예약확정""},""source"":""google"",""message"":""상태 변경 완료""}"
+"_liveUpdateStatus: 성공 시 data가 정상 전달됨",true,"{""ok"":true,""data"":{""reservationNo"":""20260810-0001"",""status"":""예약확정""},""source"":""google"",""message"":""상태 변경 완료""}"

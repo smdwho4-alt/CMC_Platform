@@ -377,33 +377,43 @@ function _actionUpdateStatus(no, status, confirmedAt) {
   if (!no)     return _err('예약번호(no) 필수');
   if (!status) return _err('상태(status) 필수');
 
-  const sheet    = _getSheet();
-  const lastRow  = sheet.getLastRow();
-  if (lastRow < 2) return _err('예약 없음', 404);
+  /* [DEV-003] 동시성 보호: 행 탐색~값 변경 구간을 잠금(_actionCreate와 동일 패턴).
+   * releaseLock은 finally에서 호출하여 예외·조기 return(404 등) 시에도 반드시 해제되게 한다. */
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); }
+  catch (lockErr) { return _err('동시 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', 503); }
 
-  const noCol  = sheet.getRange(2, COL.예약번호, lastRow - 1, 1).getValues();
-  const rowIdx = noCol.findIndex(r => r[0] === no);
-  if (rowIdx === -1) return _err('예약번호 없음: ' + no, 404);
+  try {
+    const sheet    = _getSheet();
+    const lastRow  = sheet.getLastRow();
+    if (lastRow < 2) return _err('예약 없음', 404);
 
-  const sheetRow = rowIdx + 2;
-  sheet.getRange(sheetRow, COL.예약상태).setValue(status);
+    const noCol  = sheet.getRange(2, COL.예약번호, lastRow - 1, 1).getValues();
+    const rowIdx = noCol.findIndex(r => r[0] === no);
+    if (rowIdx === -1) return _err('예약번호 없음: ' + no, 404);
 
-  if (status === '예약확정') {
-    const confirmed = confirmedAt || Utilities.formatDate(new Date(), TIMEZONE, DATE_FORMAT);
-    sheet.getRange(sheetRow, COL.예약확정일).setValue(confirmed);
+    const sheetRow = rowIdx + 2;
+    sheet.getRange(sheetRow, COL.예약상태).setValue(status);
+
+    if (status === '예약확정') {
+      const confirmed = confirmedAt || Utilities.formatDate(new Date(), TIMEZONE, DATE_FORMAT);
+      sheet.getRange(sheetRow, COL.예약확정일).setValue(confirmed);
+    }
+
+    /* 검진시작/종료 자동 타임스탬프 */
+    const now = Utilities.formatDate(new Date(), TIMEZONE, DATE_FORMAT);
+    if (status === '검진중') {
+      sheet.getRange(sheetRow, COL.접수시간).setValue(now);
+      sheet.getRange(sheetRow, COL.검진시작).setValue(now);
+    }
+    if (status === '검진완료') {
+      sheet.getRange(sheetRow, COL.검진종료).setValue(now);
+    }
+
+    return _ok({ reservationNo: no, status }, { message: '상태 변경 완료' });
+  } finally {
+    lock.releaseLock();
   }
-
-  /* 검진시작/종료 자동 타임스탬프 */
-  const now = Utilities.formatDate(new Date(), TIMEZONE, DATE_FORMAT);
-  if (status === '검진중') {
-    sheet.getRange(sheetRow, COL.접수시간).setValue(now);
-    sheet.getRange(sheetRow, COL.검진시작).setValue(now);
-  }
-  if (status === '검진완료') {
-    sheet.getRange(sheetRow, COL.검진종료).setValue(now);
-  }
-
-  return _ok({ reservationNo: no, status }, { message: '상태 변경 완료' });
 }
 
 /* ─── 운영 정보 업데이트 ───────────────────────────── */
@@ -447,62 +457,71 @@ function _actionUpdateOps(no, data) {
 function _actionUpdate(no, data) {
   if (!no || !data) return _err('no, data 필수');
 
-  const sheet    = _getSheet();
-  const lastRow  = sheet.getLastRow();
-  if (lastRow < 2) return _err('예약 없음', 404);
+  /* [DEV-003] 동시성 보호: updateStatus와 동일 패턴. */
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); }
+  catch (lockErr) { return _err('동시 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', 503); }
 
-  const noCol  = sheet.getRange(2, COL.예약번호, lastRow - 1, 1).getValues();
-  const rowIdx = noCol.findIndex(r => r[0] === no);
-  if (rowIdx === -1) return _err('예약번호 없음: ' + no, 404);
+  try {
+    const sheet    = _getSheet();
+    const lastRow  = sheet.getLastRow();
+    if (lastRow < 2) return _err('예약 없음', 404);
 
-  const sheetRow   = rowIdx + 2;
-  const fieldToCol = {
-    name:          COL.성명,
-    birth:         COL.생년월일,
-    phone:         COL.연락처,
-    gender:        COL.성별,
-    program:       COL.검진프로그램,
-    wishDate:      COL.희망검진일,
-    wishTime:      COL.희망시간,
-    sleep:         COL.수면,
-    optionalTests: COL.선택검사,
-    company:       COL.사업장,
-    route:         COL.예약경로,
-    manager:       COL.담당자,
-    status:        COL.예약상태,
-    confirmedAt:   COL.예약확정일,
-    smsSent:       COL.문자발송,
-    note:          COL.특이사항,
-    scheduledTime: COL.검진예정시간,
-    checkinTime:   COL.접수시간,
-    examStart:     COL.검진시작,
-    examEnd:       COL.검진종료,
-    examRoom:      COL.검진실,
-    doctor:        COL.문진의사,
-    nurse:         COL.담당간호사,
-    estimatedCost: COL.예상비용,
-    paymentStatus: COL.결제상태,
-    resultStatus:  COL.결과발송,
-    revisit:       COL.재예약여부,
-  };
+    const noCol  = sheet.getRange(2, COL.예약번호, lastRow - 1, 1).getValues();
+    const rowIdx = noCol.findIndex(r => r[0] === no);
+    if (rowIdx === -1) return _err('예약번호 없음: ' + no, 404);
 
-  /* [DateFix] 생년월일·희망검진일·희망시간은 update 경로로도 Sheets 자동 날짜변환에
-   * 노출된다. create와 동일하게 텍스트('@') 서식을 강제해 셀이 다시 Date로
-   * 저장되는 것을 막는다(그 외 필드는 기존과 동일하게 처리). 특히 STEP1.5 배포 이전에
-   * 생성된 레거시 행(셀 서식이 아직 자동/Date인 행)을 이 경로로 수정할 때 중요하다. */
-  const DATE_TEXT_COLS = { birth: COL.생년월일, wishDate: COL.희망검진일, wishTime: COL.희망시간 };
+    const sheetRow   = rowIdx + 2;
+    const fieldToCol = {
+      name:          COL.성명,
+      birth:         COL.생년월일,
+      phone:         COL.연락처,
+      gender:        COL.성별,
+      program:       COL.검진프로그램,
+      wishDate:      COL.희망검진일,
+      wishTime:      COL.희망시간,
+      sleep:         COL.수면,
+      optionalTests: COL.선택검사,
+      company:       COL.사업장,
+      route:         COL.예약경로,
+      manager:       COL.담당자,
+      status:        COL.예약상태,
+      confirmedAt:   COL.예약확정일,
+      smsSent:       COL.문자발송,
+      note:          COL.특이사항,
+      scheduledTime: COL.검진예정시간,
+      checkinTime:   COL.접수시간,
+      examStart:     COL.검진시작,
+      examEnd:       COL.검진종료,
+      examRoom:      COL.검진실,
+      doctor:        COL.문진의사,
+      nurse:         COL.담당간호사,
+      estimatedCost: COL.예상비용,
+      paymentStatus: COL.결제상태,
+      resultStatus:  COL.결과발송,
+      revisit:       COL.재예약여부,
+    };
 
-  Object.entries(data).forEach(([field, value]) => {
-    const col = fieldToCol[field];
-    if (!col) return;
-    const val   = Array.isArray(value) ? value.join(', ') : (value ?? '');
-    const range = sheet.getRange(sheetRow, col);
-    if (DATE_TEXT_COLS[field]) {
-      range.setNumberFormat('@').setValue(String(val));
-    } else {
-      range.setValue(val);
-    }
-  });
+    /* [DateFix] 생년월일·희망검진일·희망시간은 update 경로로도 Sheets 자동 날짜변환에
+     * 노출된다. create와 동일하게 텍스트('@') 서식을 강제해 셀이 다시 Date로
+     * 저장되는 것을 막는다(그 외 필드는 기존과 동일하게 처리). 특히 STEP1.5 배포 이전에
+     * 생성된 레거시 행(셀 서식이 아직 자동/Date인 행)을 이 경로로 수정할 때 중요하다. */
+    const DATE_TEXT_COLS = { birth: COL.생년월일, wishDate: COL.희망검진일, wishTime: COL.희망시간 };
 
-  return _ok({ reservationNo: no }, { message: '업데이트 완료' });
+    Object.entries(data).forEach(([field, value]) => {
+      const col = fieldToCol[field];
+      if (!col) return;
+      const val   = Array.isArray(value) ? value.join(', ') : (value ?? '');
+      const range = sheet.getRange(sheetRow, col);
+      if (DATE_TEXT_COLS[field]) {
+        range.setNumberFormat('@').setValue(String(val));
+      } else {
+        range.setValue(val);
+      }
+    });
+
+    return _ok({ reservationNo: no }, { message: '업데이트 완료' });
+  } finally {
+    lock.releaseLock();
+  }
 }

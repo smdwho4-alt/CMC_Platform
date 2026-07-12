@@ -22,7 +22,7 @@ const CMC_CONFIG = {
   /* Apps Script Web App */
   appsScript: {
     webAppUrl:  'https://script.google.com/macros/s/AKfycbzHYWqERR8_hHxzIgCNwvrU8NLtZqu9RVuxezTBWtUKcTleAgcqRhYPX5rnHAM7uCGjng/exec',
-    sheetName:  '예약현황',
+    sheetName:  '종합검진_예약대장',
     timezone:   'Asia/Seoul',
   },
 

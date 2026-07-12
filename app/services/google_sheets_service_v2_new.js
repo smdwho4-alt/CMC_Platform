@@ -170,7 +170,7 @@ const CMC_SheetsServiceV2 = {
     try {
       const res = await this._post({ action: 'updateStatus', no, status, confirmedAt });
       console.log(`[SheetsV2 Live] updateStatus → ${no} : ${status}`);
-      return { ok: res.ok, data: res.data, source: 'google', message: res.message };
+      return { ok: res.ok, data: res.data, source: 'google', message: res.message, error: res.error };
     } catch (e) {
       return { ok: false, error: e.message, source: 'google' };
     }
@@ -180,7 +180,7 @@ const CMC_SheetsServiceV2 = {
     try {
       const res = await this._post({ action: 'update', no, data: patch });
       console.log(`[SheetsV2 Live] update → ${no}`);
-      return { ok: res.ok, data: res.data, source: 'google', message: res.message };
+      return { ok: res.ok, data: res.data, source: 'google', message: res.message, error: res.error };
     } catch (e) {
       return { ok: false, error: e.message, source: 'google' };
     }

@@ -2,7 +2,7 @@
 
 > 이 문서는 프로젝트의 **현재 시점 상태 스냅샷**이다. 최신 정보를 유지하는 것이 원칙이며, 상태가 바뀔 때마다 갱신한다.
 
-**최종 갱신**: 2026-07-04
+**최종 갱신**: 2026-07-12 (DEV-003 구현 완료 반영)
 **버전**: v0.9.0-pilot (릴리스 상세: [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md), 최종 검토: [PILOT_READINESS_REVIEW.md](PILOT_READINESS_REVIEW.md))
 **단계**: Sprint A~I + Sprint 2(Dashboard v3) 완료 → **Architecture Freeze(Sprint 0) 완료** → **구조 Freeze(v0.9.0 기준) 확정** → **Pilot Ready 미충족 (준비 중)**
 
@@ -27,7 +27,7 @@
 | **Pilot Ready** | 🔴 **미충족** — Known Issues §2 해결 후 재평가 |
 | STEP1.5 DateFix 코드 수정 | ✅ **완료** (`_actionUpdate`/`_actionSummary` 하드닝 포함, 회귀 테스트 150건 FAIL 0) — [STEP1.5.2_DateFix_Complete_new.md](STEP1.5.2_DateFix_Complete_new.md) |
 | STEP1.5 DateFix 실배포 | 🔴 **미반영 — 사용자 조치 필요** (Apps Script는 이 세션에서 배포 불가) |
-| DEV-003 (관리자 예약관리 Sheets연동) | ⚠️ 설계 확정, 구현 미착수 |
+| DEV-003 (관리자 예약관리 Sheets연동) | ✅ 구현+테스트 완료(60/60 PASS), Lock 재배포 대기 — Subagent-Driven Development로 구현, Architecture Freeze 준수 확인(신규 파일/폴더 구조 변경 없음, 지정된 파일만 최소 수정) |
 
 ---
 
@@ -55,11 +55,30 @@
 
 ---
 
+## 2-1. DEV-003 완료 (2026-07-12) — 관리자 예약관리 Sheets Live 연동
+
+- **구현 방식**: Subagent-Driven Development(태스크별 구현→리뷰→수정, 최종 통합 리뷰 후 단일 커밋).
+- **범위**: `admin_reservations_v2_new.html` 신규 생성(원본 무수정), `sheets_api_v3_final.gs`의 `_actionUpdateStatus`/`_actionUpdate`에 LockService 보강, `config_v2_new.js` sheetName 값 정정, `google_sheets_service_v2_new.js` 503 오류 메시지 전달 수정(어댑터가 `res.error`를 버리던 결함).
+- **Architecture Freeze 준수 확인**: 신규 폴더 없음, 신규 파일은 계획서에 명시된 `_v2_new`/테스트 파일뿐, 원본 `admin_reservations_new.html` 등 기존 화면 무수정(git diff 0 확인), 다른 Apps Script 액션(`create`/`list`/`get`/`summary`/`updateOps`) 로직·응답 포맷 무변경.
+- **테스트**: 신규 3개 스위트 60/60 PASS(`tests/run_dev003_backend_qa.js` 26건, `tests/run_dev003_frontend_qa.js` 29건, `tests/run_dev003_adapter_error_qa.js` 5건). LOCAL 모드 브라우저 QA 통과, 원본 화면 회귀 없음.
+- **DEV-003_..._Design_Final_new.md §11 QA Checklist**: 20개 항목 중 14개 완료, 1개 부분(간접) 확인, 5개는 아래 Release Checklist 항목에 의존해 대기.
+
+### Release Checklist (Pilot Ready 전 필수, DEV-003 커밋 범위 밖)
+
+| # | 항목 | 비고 |
+|---|------|------|
+| 1 | Google Apps Script(`sheets_api_v3_final.gs`) 재배포 — "새 버전" | STEP1.5 DateFix + DEV-003 Lock 보강 동시 반영됨. 사용자 조치 필요(Google 계정 인증 필요, 이 세션에서 불가) |
+| 2 | Live 모드 API 응답시간 실측(NFR 기준 3초 이내) | 재배포 후 실측 |
+| 3 | `reservation_v2_new.html` 실제 브라우저 QA | 이번 세션 도구(스크린샷) 장애로 미완, 파일 자체는 무수정 확인됨(회귀 위험 낮음) |
+| 4 | `CMC_CONFIG.load()` 미호출 — 모드전환 롤백 미작동 | Follow-up 세션 진행 중(task_a8cf5790). DEV-003 발견이나 이 폴더 전체(원본 페이지 포함)에 적용되는 기존 결함이라 별도 티켓으로 분리 |
+
+---
+
 ## 3. 진행 중 / 대기 항목
 
 | 항목 | 상태 | 비고 |
 |---|---|---|
-| `admin_reservations_v2_new.html` (DEV-003 구현) | 설계 확정(Final), 코드 미작성 | `DEV-003_..._Design_Final_new.md` 참조 |
+| `admin_reservations_v2_new.html` (DEV-003 구현) | ✅ 완료, Lock 재배포만 대기 | §2-1 Release Checklist 참조 |
 | 더미 예약 데이터 정리 | 파일럿 1주차 허용 | `data/reservations.json` 중 QA 더미 |
 | 더미 계정 정리 (USR-0001~0003) | WARN, 운영 전 정리 필요 | `data/users.json` |
 | LLM 기반 의도 분류 전환 | 규칙 기반이 기본, Claude API는 Key 설정 시만 | `agent_orchestrator.py` 교체 지점 주석 있음 |
