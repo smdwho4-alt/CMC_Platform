@@ -37,10 +37,11 @@ results: list[tuple[str, str, str]] = []
 
 def check(name: str, ok: bool, detail: str = "") -> None:
     results.append((name, "PASS" if ok else "FAIL", detail))
+    line = f"[{'PASS' if ok else 'FAIL'}] {name} {('- ' + detail) if detail else ''}"
     try:
-        print(f"[{'PASS' if ok else 'FAIL'}] {name} {('- ' + detail) if detail else ''}")
+        print(line)
     except UnicodeEncodeError:
-        pass
+        print(line.encode("ascii", "backslashreplace").decode("ascii"))
 
 
 # ── 1. _date_range() 단위 테스트 ──
@@ -64,8 +65,14 @@ except ValueError:
 
 
 # ── 2. GET /api/admin/statistics 통합 테스트 ──
+# Sprint 3 Commit 1(RBAC) 반영: /api/admin/statistics는 statistics:view 권한이
+# 필요하다. STAFF(ROLE-STAFF)는 이 권한이 없으므로(roles.json 확인 근거) 통계
+# 엔드포인트 테스트는 DIRECTOR(ROLE-DIRECTOR, statistics:view 보유)를 사용한다.
+# 이 변경은 회귀가 아니라 Sprint 3에서 의도적으로 강화된 접근 통제를 반영한 것이다
+# — 권한 자체의 매트릭스 검증은 tests/run_sprint3_rbac_qa.py에서 별도로 다룬다.
 client = TestClient(create_app(SANDBOX, include_agents=False))
 STAFF = {"X-User-Id": "USR-0002"}
+DIRECTOR = {"X-User-Id": "USR-0001"}
 
 check("헤더 없이 조회 → 401", client.get("/api/admin/statistics").status_code == 401)
 
@@ -85,7 +92,7 @@ def _fake_get_summary(date="", **kw):
 
 sheets.get_summary = _fake_get_summary
 
-r1 = client.get("/api/admin/statistics", params={"dateFrom": "2026-07-01", "dateTo": "2026-07-02"}, headers=STAFF)
+r1 = client.get("/api/admin/statistics", params={"dateFrom": "2026-07-01", "dateTo": "2026-07-02"}, headers=DIRECTOR)
 check("기간 지정 조회 → 200", r1.status_code == 200, str(r1.status_code))
 body1 = r1.json()
 check("totalReservations = GAS summary 합산(2+3=5)", body1["totalReservations"] == 5, str(body1["totalReservations"]))
@@ -94,15 +101,15 @@ check("byStatus 병합(CONFIRMED=2)", body1["byStatus"].get("CONFIRMED") == 2)
 check("byDate 2건(일자별 breakdown)", len(body1["byDate"]) == 2, str(body1["byDate"]))
 check("dayErrors 없음(정상 시)", body1["dayErrors"] == [])
 
-r2 = client.get("/api/admin/statistics", headers=STAFF)
+r2 = client.get("/api/admin/statistics", headers=DIRECTOR)
 check("dateFrom/dateTo 미지정 시 오늘 하루만 조회 → 200", r2.status_code == 200)
 body2 = r2.json()
 check("미지정 시 byDate 1건(오늘)", len(body2["byDate"]) == 1, str(body2["byDate"]))
 
-r3 = client.get("/api/admin/statistics", params={"dateFrom": "2026-01-01", "dateTo": "2026-12-31"}, headers=STAFF)
+r3 = client.get("/api/admin/statistics", params={"dateFrom": "2026-01-01", "dateTo": "2026-12-31"}, headers=DIRECTOR)
 check("기간 너무 김 → 400", r3.status_code == 400, str(r3.status_code))
 
-r4 = client.get("/api/admin/statistics", params={"dateFrom": "bad-date", "dateTo": "2026-07-01"}, headers=STAFF)
+r4 = client.get("/api/admin/statistics", params={"dateFrom": "bad-date", "dateTo": "2026-07-01"}, headers=DIRECTOR)
 check("잘못된 날짜 형식 → 400", r4.status_code == 400)
 
 # ── 3. 부분 실패(하루만 GAS 오류) — 나머지 날짜는 정상 집계 ──
@@ -113,7 +120,7 @@ def _fake_partial_fail(date="", **kw):
 
 
 sheets.get_summary = _fake_partial_fail
-r5 = client.get("/api/admin/statistics", params={"dateFrom": "2026-07-01", "dateTo": "2026-07-02"}, headers=STAFF)
+r5 = client.get("/api/admin/statistics", params={"dateFrom": "2026-07-01", "dateTo": "2026-07-02"}, headers=DIRECTOR)
 check("하루만 실패해도 200 응답", r5.status_code == 200, str(r5.status_code))
 body5 = r5.json()
 check("실패한 날짜는 dayErrors에 기록, 나머지는 정상 집계",
@@ -121,7 +128,7 @@ check("실패한 날짜는 dayErrors에 기록, 나머지는 정상 집계",
 
 # ── 4. 미설정 상태 → 503 ──
 sheets.get_summary = lambda **kw: (_ for _ in ()).throw(sheets.SheetsIntegrationNotConfigured("미설정(테스트)"))
-r6 = client.get("/api/admin/statistics", headers=STAFF)
+r6 = client.get("/api/admin/statistics", headers=DIRECTOR)
 check("Sheets 미설정 시 503", r6.status_code == 503, str(r6.status_code))
 
 # ── 5. 기존 기능 회귀 확인 ──

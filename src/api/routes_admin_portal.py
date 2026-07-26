@@ -1,21 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-CSHSP Admin Portal Routes — Sprint 1(Commit 2) + Sprint 2(Commit 1: Dashboard)
+CSHSP Admin Portal Routes — Sprint 1~3
 
-Single Admin Portal의 조회 전용 API. Google Sheets를 예약 마스터 데이터로
-Google Workspace Integration Layer(GAS) 경유로 읽기만 한다 — 쓰기 기능 없음
-(Enterprise_Architecture_ToBe_v1.0.md §4/§10, PM 승인 제외범위 준수).
+Single Admin Portal API. 이 파일은 두 개의 라우터 팩토리를 제공한다(PM Sprint 2
+결정사항 2: 신규 Namespace는 /api/admin/만 사용, Sprint 1 기존 /api/admin-portal/*는
+삭제하지 않음).
+- create_admin_portal_router(): Sprint 1 라우터(/api/admin-portal/*) — health/reservations
+- create_admin_namespace_router(): Sprint 2 라우터(/api/admin/*) — dashboard/statistics
+  (Sprint 3 Commit 2 이후 상담관리 등 추가 예정, 신규 라우터 재생성 아님)
 
-이 파일은 두 개의 라우터 팩토리를 제공한다(PM Sprint 2 결정사항 2: 신규 Namespace는
-/api/admin/만 사용, Sprint 1 기존 /api/admin-portal/*는 삭제/변경하지 않음).
-- create_admin_portal_router(): Sprint 1 기존 라우터(/api/admin-portal/*) — 무변경
-- create_admin_namespace_router(): Sprint 2 신규 라우터(/api/admin/*) — Dashboard/통계
-
-인증은 기존 api_server.py의 Mock 인증(X-User-Id 헤더 + ACTIVE 사용자) 패턴을
-그대로 미러링한다 — require_user는 api_server.py 내부 closure라 외부에서
+인증(Authentication)은 기존 api_server.py의 Mock 인증(X-User-Id 헤더 + ACTIVE 사용자)
+패턴을 그대로 미러링한다 — require_user는 api_server.py 내부 closure라 외부에서
 import할 수 없으므로, 여기서는 동일 로직을 별도로 구현한다(기존 코드 무수정,
-패턴만 재사용). 두 라우터가 동일 로직을 다시 구현하지 않도록 이 파일 내부에서
-_build_require_user()로 공유한다.
+패턴만 재사용).
+
+Sprint 3 Commit 1(RBAC): 인증 위에 권한(Role Check)을 추가했다. 모든 /api/admin/*
+및 /api/admin-portal/* 엔드포인트(공개 목적인 /health 제외)는
+"Authentication → Role Check → Endpoint" 순서를 FastAPI Depends 체인으로 강제한다
+(PM 결정사항 7). 권한 문자열은 roles.json에 이미 정의된 것만 재사용하며 새 권한
+모델을 만들지 않는다(dashboard:view/reservation:view/statistics:view 등).
 """
 from __future__ import annotations
 
@@ -37,7 +40,7 @@ import sheets_readonly_service as sheets  # noqa: E402
 
 
 def _build_require_user(data_dir: Path):
-    """Mock 인증 의존성 팩토리. 이 파일 내 두 라우터가 공유한다(로직 중복 방지)."""
+    """Mock 인증 의존성 팩토리. 이 파일 내 모든 라우터가 공유한다(로직 중복 방지)."""
     def require_user(x_user_id: str | None = Header(default=None)) -> dict[str, Any]:
         if not x_user_id:
             raise HTTPException(401, "X-User-Id 헤더 필요 (Mock 인증)")
@@ -46,6 +49,31 @@ def _build_require_user(data_dir: Path):
             raise HTTPException(401, f"유효하지 않은 사용자: {x_user_id}")
         return user
     return require_user
+
+
+def _has_permission(user: dict[str, Any], data_dir: Path, *perms: str) -> bool:
+    """roles.json의 permissions 배열을 검사한다(api_server.py의 has_perm 패턴 재사용,
+    새 권한 모델을 만들지 않고 기존 권한 문자열을 그대로 사용 — Sprint3 PM 결정사항)."""
+    role = next((r for r in loader.load_entity("Role", data_dir) if r.get("id") == user.get("roleId")), None)
+    user_perms = (role or {}).get("permissions", [])
+    return "*" in user_perms or any(p in user_perms for p in perms)
+
+
+def _build_require_permission(data_dir: Path, *perms: str):
+    """Authentication → Role Check 의존성 체인(Sprint 3 PM 결정사항 7).
+
+    FastAPI Depends 체인으로 인증(require_user)을 먼저 통과시키고, 이어서 권한을
+    검사한다 — 두 단계가 명시적으로 분리되어 순서가 코드 구조 자체로 강제된다.
+    perms 중 하나라도 있으면(OR) 통과, 역할 permissions에 '*'가 있으면 전체 허용.
+    """
+    require_user = _build_require_user(data_dir)
+
+    def require_permission(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+        if not _has_permission(user, data_dir, *perms):
+            raise HTTPException(403, f"권한 없음: {' 또는 '.join(perms)} 필요 (현재 역할 {user.get('roleId')})")
+        return user
+
+    return require_permission
 
 
 _MAX_STAT_DAYS = 31  # GAS summary를 일자별로 반복 호출하는 상한 — 무제한 호출 방지 안전장치
@@ -78,9 +106,10 @@ def _sheets_connection_status() -> tuple[str, str | None]:
 
 
 def create_admin_portal_router(data_dir: Path) -> APIRouter:
-    """Sprint 1 기존 라우터(/api/admin-portal/*). 무변경 — routes_agents.create_agents_router와 동일 패턴."""
+    """Sprint 1 기존 라우터(/api/admin-portal/*) — routes_agents.create_agents_router와 동일 패턴.
+    Sprint 3 Commit 1: 권한 검사(Role Check) 추가(PM 결정사항 7 — Authentication → Role Check → Endpoint)."""
     router = APIRouter(prefix="/api/admin-portal", tags=["admin-portal"])
-    require_user = _build_require_user(data_dir)
+    require_reservation_view = _build_require_permission(data_dir, "reservation:view")
 
     @router.get("/health")
     def health():
@@ -102,9 +131,9 @@ def create_admin_portal_router(data_dir: Path) -> APIRouter:
         sortDir: str = Query(default="desc"),
         page: int = Query(default=0, ge=0),
         pageSize: int = Query(default=0, ge=0),
-        user: dict[str, Any] = Depends(require_user),
+        user: dict[str, Any] = Depends(require_reservation_view),
     ):
-        """예약 목록 조회. search/sortBy/sortDir/page/pageSize는 Sprint 2 Commit 2에서
+        """예약 목록 조회(권한: reservation:view). search/sortBy/sortDir/page/pageSize는 Sprint 2 Commit 2에서
         추가된 Optional 파라미터로, 전달하지 않으면 Sprint 1과 완전히 동일하게 동작한다
         (PM 결정사항 4: 기본 Response Schema 불변, 신규 파라미터는 Optional)."""
         try:
@@ -128,7 +157,7 @@ def create_admin_portal_router(data_dir: Path) -> APIRouter:
         return {"ok": True, "count": len(masked), "data": masked, **extra}
 
     @router.get("/reservations/{reservation_no}")
-    def get_reservation(reservation_no: str, user: dict[str, Any] = Depends(require_user)):
+    def get_reservation(reservation_no: str, user: dict[str, Any] = Depends(require_reservation_view)):
         try:
             raw = sheets.get_reservation(reservation_no)
         except sheets.SheetsIntegrationNotConfigured as e:
@@ -145,15 +174,17 @@ def create_admin_portal_router(data_dir: Path) -> APIRouter:
 def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     """Sprint 2 신규 라우터(/api/admin/*, PM 결정사항 2 — 신규 엔드포인트 전용 Namespace).
 
-    Commit 1: GET /api/admin/dashboard
-    Commit 4(예정): GET /api/admin/statistics 를 이 라우터에 추가할 예정(신규 라우터 재생성 아님).
+    Sprint 2 Commit 1: GET /api/admin/dashboard
+    Sprint 2 Commit 4: GET /api/admin/statistics
+    Sprint 3 Commit 1: 권한 검사 추가(PM 결정사항 7).
     """
     router = APIRouter(prefix="/api/admin", tags=["admin-dashboard"])
-    require_user = _build_require_user(data_dir)
+    require_dashboard_view = _build_require_permission(data_dir, "dashboard:view")
+    require_statistics_view = _build_require_permission(data_dir, "statistics:view")
 
     @router.get("/dashboard")
-    def dashboard(user: dict[str, Any] = Depends(require_user)):
-        """Dashboard 요약 — 예약현황/오늘예약/예약상태/최근예약/시스템상태(P1).
+    def dashboard(user: dict[str, Any] = Depends(require_dashboard_view)):
+        """Dashboard 요약(권한: dashboard:view) — 예약현황/오늘예약/예약상태/최근예약/시스템상태(P1).
 
         PM 결정사항(Sprint2_Implementation_Plan_v1.0.md 승인 §PM 결정사항 1, 6):
         - 예약 관련 수치는 Google Sheets 기준(GAS summary 결과를 그대로 사용, FastAPI가
@@ -197,9 +228,9 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     @router.get("/statistics")
     def statistics(
         dateFrom: str = Query(default=""), dateTo: str = Query(default=""),
-        user: dict[str, Any] = Depends(require_user),
+        user: dict[str, Any] = Depends(require_statistics_view),
     ):
-        """통계(P4) — 예약건수/상태별/기간별, 읽기 전용.
+        """통계(권한: statistics:view) — 예약건수/상태별/기간별, 읽기 전용.
 
         PM 결정사항 6: FastAPI가 직접 계산하지 않는다. GAS의 기존 summary 액션은
         단일 날짜만 지원하므로(sheets_api_v3_final.gs :: _actionSummary 확인), 기간
