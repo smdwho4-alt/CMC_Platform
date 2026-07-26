@@ -1,0 +1,18 @@
+﻿테스트명,결과,상세
+모달 마크업(detailModal) 존재,PASS,
+모달 닫기 버튼 존재,PASS,
+모달 본문 컨테이너 존재,PASS,
+openDetail이 기존 /reservations/{no} 엔드포인트만 호출,PASS,
+신규 엔드포인트 경로(/api/admin/reservation-detail 등) 미생성,PASS,
+PUT/DELETE 등 쓰기 메서드 코드 없음,PASS,
+상세 응답 저장/수정 관련 코드 없음(save/update 호출),PASS,
+상세 조회 401 처리 코드 존재,PASS,
+상세 조회 404 처리 코드 존재,PASS,
+상세 조회 503 처리 코드 존재,PASS,
+상세 조회 502 처리 코드 존재,PASS,
+행 클릭 이벤트 위임(tr[data-no]) 존재,PASS,
+예약조회 결과 테이블에 data-no 속성 부여,PASS,
+Dashboard 최근예약 테이블에도 data-no 속성 부여(재사용),PASS,2
+ESC 키로 모달 닫기 처리 존재,PASS,
+오버레이 바깥 클릭으로 모달 닫기 처리 존재,PASS,
+상세 필드 렌더링에도 esc() 사용,PASS,

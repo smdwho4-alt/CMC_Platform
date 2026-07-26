@@ -48,6 +48,17 @@
   .panel h2 { font-size: 14px; margin: 0 0 10px; color: #444; }
   .status-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px dashed var(--gray-300); }
   .status-row:last-child { border-bottom: none; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: var(--gray-100); }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none;
+                    align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: #fff; border-radius: 10px; max-width: 480px; width: 100%;
+               max-height: 85vh; overflow-y: auto; }
+  .modal-box header { border-radius: 10px 10px 0 0; }
+  .modal-body { padding: 16px; }
+  .modal-body .status-row span:first-child { color: var(--gray-500); }
+  .modal-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 0 4px; }
 </style>
 </head>
 <body>
@@ -148,6 +159,20 @@
   </section>
 </main>
 
+<!-- 예약상세(P3) — 조회 전용 모달. Sprint 1 기존 엔드포인트(/api/admin-portal/reservations/{no})를
+     100% 재사용하며 신규 백엔드는 없다(PM 결정사항 3). 쓰기 UI 없음. -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <header style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;">
+      <strong id="detailTitle">예약 상세</strong>
+      <button class="modal-close" id="detailCloseBtn" aria-label="닫기">✕</button>
+    </header>
+    <div class="modal-body" id="detailBody">
+      <div class="state-box">불러오는 중…</div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -243,8 +268,9 @@
     if (!list || !list.length) { el.className = 'state-box'; el.textContent = '예약이 없습니다.'; return; }
     var head = '<tr><th>예약번호</th><th>성명</th><th>프로그램</th><th>희망일</th><th>상태</th></tr>';
     var body = list.map(function (r) {
-      return '<tr><td>' + esc(r.reservationNo) + '</td><td>' + esc(r.name) + '</td><td>'
-        + esc(r.program) + '</td><td>' + esc(r.wishDate) + '</td><td>' + esc(r.status) + '</td></tr>';
+      return '<tr class="clickable" data-no="' + esc(r.reservationNo) + '"><td>' + esc(r.reservationNo)
+        + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.program) + '</td><td>' + esc(r.wishDate)
+        + '</td><td>' + esc(r.status) + '</td></tr>';
     }).join('');
     el.className = ''; el.innerHTML = '<table>' + head + body + '</table>';
   }
@@ -291,7 +317,7 @@
     var head = '<tr><th>예약번호</th><th>성명</th><th>생년월일</th><th>휴대전화</th>'
              + '<th>프로그램</th><th>희망일</th><th>희망시간</th><th>상태</th></tr>';
     var body = rows.map(function (r) {
-      return '<tr>'
+      return '<tr class="clickable" data-no="' + esc(r.reservationNo) + '">'
         + '<td>' + esc(r.reservationNo) + '</td>'
         + '<td>' + esc(r.name) + '</td>'
         + '<td>' + esc(r.birth) + '</td>'
@@ -360,6 +386,56 @@
 
   prevPageBtn.addEventListener('click', function () { currentPage = Math.max(0, currentPage - 1); load(false); });
   nextPageBtn.addEventListener('click', function () { currentPage += 1; load(false); });
+
+  // ── 예약상세(P3) 모달 — Sprint 1 기존 GET /reservations/{no}를 100% 그대로 재사용,
+  //    신규 백엔드 없음(PM 결정사항 3). 조회 전용, PII는 서버 마스킹 그대로 표시. ──
+  var detailModal = document.getElementById('detailModal');
+  var detailBody = document.getElementById('detailBody');
+  var detailCloseBtn = document.getElementById('detailCloseBtn');
+
+  function closeDetail() { detailModal.classList.remove('open'); }
+  detailCloseBtn.addEventListener('click', closeDetail);
+  detailModal.addEventListener('click', function (e) { if (e.target === detailModal) closeDetail(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDetail(); });
+
+  var DETAIL_FIELDS = [
+    ['reservationNo', '예약번호'], ['name', '성명'], ['birth', '생년월일'], ['phone', '휴대전화'],
+    ['program', '프로그램'], ['wishDate', '희망일'], ['wishTime', '희망시간'], ['status', '상태'],
+    ['createdAt', '접수일시'], ['note', '특이사항'],
+  ];
+
+  function openDetail(reservationNo) {
+    var userId = currentUserId();
+    if (!userId) return;
+    detailModal.classList.add('open');
+    detailBody.innerHTML = '<div class="state-box">불러오는 중…</div>';
+
+    fetch(PORTAL_BASE + '/reservations/' + encodeURIComponent(reservationNo), { headers: { 'X-User-Id': userId } })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 404) throw new Error('예약을 찾을 수 없습니다: ' + reservationNo);
+        if (r.status === 503) throw new Error('Sheets 연동이 설정되지 않았습니다. 관리자에게 문의하세요.');
+        if (r.status === 502) throw new Error('Sheets 연동 서버 오류입니다. 잠시 후 다시 시도해 주세요.');
+        if (!r.ok) throw new Error('조회 실패(HTTP ' + r.status + ')');
+        return r.json();
+      })
+      .then(function (body) {
+        var d = body.data || {};
+        var rows = DETAIL_FIELDS.map(function (f) {
+          return '<div class="status-row"><span>' + esc(f[1]) + '</span><span>' + esc(d[f[0]] || '-') + '</span></div>';
+        }).join('');
+        detailBody.innerHTML = rows;
+      })
+      .catch(function (err) {
+        detailBody.innerHTML = '<div class="state-box error">' + esc(err.message || '알 수 없는 오류가 발생했습니다.') + '</div>';
+      });
+  }
+
+  // 행 클릭 위임(Dashboard 최근예약 + 예약조회 결과 테이블 공용 — 매 렌더마다 재바인딩 불필요)
+  document.addEventListener('click', function (e) {
+    var tr = e.target.closest ? e.target.closest('tr[data-no]') : null;
+    if (tr) openDetail(tr.getAttribute('data-no'));
+  });
 
   applyUserBtn.addEventListener('click', function () {
     var userId = currentUserId();
