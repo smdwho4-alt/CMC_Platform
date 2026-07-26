@@ -1,0 +1,19 @@
+﻿테스트명,결과,상세
+헤더 없이 조회 → 401,PASS,
+"STAFF → 200(기존 엔드포인트에 권한 제한 없음, 원 코드 그대로)",PASS,200
+응답에 기존 필드 'totalChats' 포함,PASS,
+응답에 기존 필드 'uniqueSessions' 포함,PASS,
+응답에 기존 필드 'reservationConversions' 포함,PASS,
+응답에 기존 필드 'conversionRate' 포함,PASS,
+응답에 기존 필드 'safetyBlocks' 포함,PASS,
+응답에 기존 필드 'safetyByCategory' 포함,PASS,
+응답에 기존 필드 'phoneVerified' 포함,PASS,
+응답에 기존 필드 'questionnaireSubmits' 포함,PASS,
+응답에 기존 필드 'crmEscalations' 포함,PASS,
+"AI-AGENT 계정도 조회 가능(기존 코드 동작 그대로, 이번 Commit이 제한 추가 안 함)",PASS,
+작업트리에 커밋되지 않은 프로덕션 .py 변경 없음(신규 백엔드 없음 확인),PASS,[]
+AI 상담 지원 탭 버튼 존재,PASS,
+AI 상담 지원 뷰 섹션 존재,PASS,
+기존 최상위 엔드포인트(/api/dashboard/ai)를 직접 호출,PASS,
+신규 /api/admin/ai* 류 엔드포인트를 만들지 않음(호출 안 함),PASS,
+상담관리 탭의 AI 채팅 경로 필터 안내 문구 존재(Commit 2 연결 재확인),PASS,
