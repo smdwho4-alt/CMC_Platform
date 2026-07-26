@@ -1,0 +1,21 @@
+﻿테스트명,결과,상세
+헤더 없이 목록 조회 → 401,PASS,
+무효 사용자 → 401,PASS,
+정상 사용자 목록 조회 → 200,PASS,200
+목록 응답에 마스킹된 이름 포함,PASS,홍○○
+목록 응답에 마스킹된 생년월일 포함,PASS,
+목록 응답에 마스킹된 휴대전화 포함,PASS,
+목록 응답에 원본 phone 값 미노출,PASS,
+목록 응답 count 필드,PASS,
+정상 사용자 단건 조회 → 200,PASS,200
+단건 조회 마스킹 적용,PASS,
+존재하지 않는 예약번호 → 404,PASS,404
+health 엔드포인트 인증 없이 접근 가능,PASS,200
+health 정상 연결 응답,PASS,
+Sheets 미설정 시 목록조회 → 503,PASS,503
+GAS 연동 오류 시 목록조회 → 502,PASS,502
+GAS 연동 오류 시 단건조회 → 502,PASS,502
+health: Sheets 미설정 시에도 200 + not_configured 표시(오류 UX),PASS,
+빈 데이터는 오류가 아니라 count=0으로 정상 응답,PASS,"{'ok': True, 'count': 0, 'data': []}"
+기존 /api/health 정상 동작(무영향),PASS,
+기존 /api/reservations 인증 필요 그대로 유지(무영향),PASS,
