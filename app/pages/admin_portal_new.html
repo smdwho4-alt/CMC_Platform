@@ -72,6 +72,7 @@
   <button data-view="reservations">예약조회</button>
   <button data-view="statistics">통계</button>
   <button data-view="consultations">상담관리</button>
+  <button data-view="auditlog">감사로그</button>
 </nav>
 
 <main>
@@ -216,6 +217,30 @@
       <div class="state-box">직원 ID를 입력하고 "조회"를 눌러주세요.</div>
     </div>
   </section>
+
+  <!-- 감사로그(P3) — 기존 GET /api/audit-logs를 그대로 호출한다. 신규 백엔드 없음
+       (PM 결정사항 5). 응답 스키마가 Portal의 다른 엔드포인트({ok,data,...})와 달리
+       기존 그대로 {count, records}이므로 렌더링에서만 다르게 처리한다. -->
+  <section id="view-auditlog" class="view">
+    <div class="toolbar">
+      <div>
+        <label for="auditActionInput">이벤트(action)</label><br>
+        <input type="text" id="auditActionInput" placeholder="예: RESERVATION_APPROVED">
+      </div>
+      <div>
+        <label for="auditDateInput">일자</label><br>
+        <input type="date" id="auditDateInput">
+      </div>
+      <div>
+        <label for="auditQueryInput">검색</label><br>
+        <input type="search" id="auditQueryInput" placeholder="예약번호/사용자ID 등">
+      </div>
+      <button id="auditLoadBtn" style="align-self:flex-end">조회</button>
+    </div>
+    <div id="auditResultArea">
+      <div class="state-box">직원 ID를 입력하고 "조회"를 눌러주세요.</div>
+    </div>
+  </section>
 </main>
 
 <!-- 예약상세(P3) — 조회 전용 모달. Sprint 1 기존 엔드포인트(/api/admin-portal/reservations/{no})를
@@ -241,6 +266,8 @@
   var API_ROOT = _params.get('api') || 'http://localhost:8600';
   var PORTAL_BASE = API_ROOT + '/api/admin-portal';   // Sprint 1 기존 Namespace
   var ADMIN_BASE = API_ROOT + '/api/admin';           // Sprint 2 신규 Namespace(PM 결정사항 2)
+  // 감사로그는 신규 백엔드 없이 기존 최상위 엔드포인트를 그대로 호출한다(PM 결정사항 5).
+  var AUDIT_LOG_URL = API_ROOT + '/api/audit-logs';
   var USER_ID_KEY = 'cshsp_admin_portal_user_id';
 
   var connBadge = document.getElementById('connBadge');
@@ -293,6 +320,7 @@
       if (btn.dataset.view === 'dashboard') loadDashboard();
       if (btn.dataset.view === 'statistics') loadStatistics();
       if (btn.dataset.view === 'consultations') loadConsultations();
+      if (btn.dataset.view === 'auditlog') loadAuditLog();
     });
   });
 
@@ -536,6 +564,62 @@
     var btn = e.target.closest ? e.target.closest('.crm-advance-btn') : null;
     if (btn) advanceConsultation(btn.dataset.id, btn.dataset.next, btn);
   });
+
+  // ── 감사로그(P3, Sprint 3) — 기존 GET /api/audit-logs 재사용, 신규 백엔드 없음 ──
+  var auditActionInput = document.getElementById('auditActionInput');
+  var auditDateInput = document.getElementById('auditDateInput');
+  var auditQueryInput = document.getElementById('auditQueryInput');
+  var auditLoadBtn = document.getElementById('auditLoadBtn');
+  var auditResultArea = document.getElementById('auditResultArea');
+
+  function showAuditState(message, isError) {
+    auditResultArea.innerHTML = '<div class="state-box' + (isError ? ' error' : '') + '">' + esc(message) + '</div>';
+  }
+
+  function renderAuditLog(rows) {
+    if (!rows.length) { showAuditState('조회된 감사로그가 없습니다.'); return; }
+    var head = '<tr><th>시각</th><th>이벤트</th><th>대상</th><th>ID</th><th>수행자</th><th>역할</th><th>경로</th></tr>';
+    var body = rows.map(function (r) {
+      return '<tr>'
+        + '<td>' + esc(r.timestamp) + '</td>'
+        + '<td>' + esc(r.action) + '</td>'
+        + '<td>' + esc(r.entityType) + '</td>'
+        + '<td>' + esc(r.entityId) + '</td>'
+        + '<td>' + esc(r.actorUserId) + '</td>'
+        + '<td>' + esc(r.actorRole) + '</td>'
+        + '<td>' + esc(r.channel) + '</td>'
+        + '</tr>';
+    }).join('');
+    auditResultArea.innerHTML = '<table>' + head + body + '</table>';
+  }
+
+  function loadAuditLog() {
+    var userId = currentUserId();
+    if (!userId) { showAuditState('직원 ID를 입력해 주세요.', true); return; }
+
+    var params = new URLSearchParams();
+    if (auditActionInput.value.trim()) params.set('action', auditActionInput.value.trim());
+    if (auditDateInput.value) params.set('date', auditDateInput.value);
+    if (auditQueryInput.value.trim()) params.set('query', auditQueryInput.value.trim());
+
+    auditLoadBtn.disabled = true;
+    showAuditState('조회 중…');
+
+    fetch(AUDIT_LOG_URL + '?' + params.toString(), { headers: { 'X-User-Id': userId } })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
+        if (!r.ok) throw new Error('감사로그 조회 실패(HTTP ' + r.status + ')');
+        return r.json();
+      })
+      // 기존 엔드포인트 응답 스키마 그대로({count, records}) — Portal의 다른
+      // 엔드포인트({ok, data})와 다르지만 그대로 사용한다(신규 백엔드 없음 원칙).
+      .then(function (body) { renderAuditLog(body.records || []); })
+      .catch(function (err) { showAuditState(err.message || '알 수 없는 오류가 발생했습니다.', true); })
+      .finally(function () { auditLoadBtn.disabled = false; });
+  }
+
+  auditLoadBtn.addEventListener('click', loadAuditLog);
 
   // ── 예약조회(P2, Sprint 1 기능 유지) ──────────────────
   function renderTable(rows) {

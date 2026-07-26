@@ -1,0 +1,14 @@
+﻿테스트명,결과,상세
+헤더 없이 조회 → 401,PASS,
+"STAFF(reservation:view 보유, 기존 로직상 허용) → 200",PASS,
+DIRECTOR(audit:view 보유) → 200,PASS,
+"ROLE-CRM(reservation:view도 보유, 기존 로직상 허용) → 200",PASS,
+"AI-AGENT(audit:view도 reservation:view도 없음, 기존 로직상 거부) → 403",PASS,
+"응답 스키마가 기존 그대로({count, records})",PASS,"['count', 'records']"
+action 필터 파라미터 전달 확인,PASS,
+작업트리에 커밋되지 않은 프로덕션 .py 변경 없음(신규 백엔드 없음 확인),PASS,[]
+감사로그 탭 버튼 존재,PASS,
+감사로그 뷰 섹션 존재,PASS,
+기존 최상위 엔드포인트(/api/audit-logs)를 직접 호출,PASS,
+신규 /api/admin/audit* 류 엔드포인트를 만들지 않음(호출 안 함),PASS,
+기존 응답 스키마(body.records)를 그대로 사용,PASS,
