@@ -59,13 +59,23 @@
   .modal-body { padding: 16px; }
   .modal-body .status-row span:first-child { color: var(--gray-500); }
   .modal-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 0 4px; }
+  .toast { min-width: 220px; max-width: 360px; padding: 10px 14px; border-radius: 6px; color: #fff;
+           font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.2); opacity: 0; transform: translateX(20px);
+           transition: opacity .2s, transform .2s; }
+  .toast.show { opacity: 1; transform: translateX(0); }
+  .toast.success { background: var(--ok); }
+  .toast.error { background: var(--danger); }
 </style>
 </head>
 <body>
 <header>
-  <h1>🏥 Single Admin Portal <span style="font-weight:400;opacity:.85">— 조회 전용 통합(Sprint 2)</span></h1>
-  <span id="connBadge" class="badge badge-unknown">연결 확인 중…</span>
+  <h1>🏥 Single Admin Portal <span style="font-weight:400;opacity:.85">— Sprint 3(Operator First)</span></h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="currentUserBadge" class="badge badge-unknown">로그인 안 됨</span>
+    <span id="connBadge" class="badge badge-unknown">연결 확인 중…</span>
+  </div>
 </header>
+<div id="toastContainer" style="position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px"></div>
 
 <nav class="tabs">
   <button data-view="dashboard" class="active">Dashboard</button>
@@ -299,6 +309,8 @@
   var USER_ID_KEY = 'cshsp_admin_portal_user_id';
 
   var connBadge = document.getElementById('connBadge');
+  var currentUserBadge = document.getElementById('currentUserBadge');
+  var toastContainer = document.getElementById('toastContainer');
   var userIdInput = document.getElementById('userIdInput');
   var applyUserBtn = document.getElementById('applyUserBtn');
   var statusSelect = document.getElementById('statusSelect');
@@ -325,6 +337,35 @@
   }
 
   function currentUserId() { return userIdInput.value.trim(); }
+
+  // Sprint 3 Commit 5(운영자 UX): 헤더에 현재 적용된 사용자 ID를 상시 표시한다.
+  // 역할(role) 이름까지 표시하려면 신규 조회가 필요해 이번 Commit 범위(신규
+  // Endpoint 추가 없이 기존 정보만 재사용)에서는 제외했다 — 이미 입력창에 있는
+  // 값을 그대로 헤더에도 보여주는 수준의 최소 개선이다.
+  function updateCurrentUserBadge() {
+    var id = currentUserId();
+    if (id) {
+      currentUserBadge.className = 'badge badge-ok';
+      currentUserBadge.textContent = '👤 ' + id;
+    } else {
+      currentUserBadge.className = 'badge badge-unknown';
+      currentUserBadge.textContent = '로그인 안 됨';
+    }
+  }
+
+  // Sprint 3 Commit 5: 작업(주로 쓰기) 성공/실패를 화면 우상단 토스트로 알린다.
+  // CRM 상태변경처럼 결과가 목록 재조회로만 반영되던 것을 명시적으로 알려준다.
+  function showToast(message, type) {
+    var el = document.createElement('div');
+    el.className = 'toast ' + (type || 'success');
+    el.textContent = message;
+    toastContainer.appendChild(el);
+    requestAnimationFrame(function () { el.classList.add('show'); });
+    setTimeout(function () {
+      el.classList.remove('show');
+      setTimeout(function () { el.remove(); }, 250);
+    }, 3000);
+  }
 
   // Sprint 3 Commit 1(RBAC): 401(인증)과 403(권한)을 구분해 안내한다.
   // 403은 FastAPI HTTPException의 {"detail": "..."} 본문에 권한 문자열이 담겨 있어
@@ -581,10 +622,13 @@
           return b;
         });
       })
-      .then(function () { loadConsultations(); })
+      .then(function (b) {
+        showToast('상담 ' + id + ' 상태가 ' + nextStatus + '(으)로 변경되었습니다.', 'success');
+        loadConsultations();
+      })
       .catch(function (err) {
         btn.disabled = false;
-        alert(err.message || '알 수 없는 오류가 발생했습니다.');
+        showToast(err.message || '알 수 없는 오류가 발생했습니다.', 'error');
       });
   }
 
@@ -649,6 +693,7 @@
   }
 
   auditLoadBtn.addEventListener('click', loadAuditLog);
+  auditQueryInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') loadAuditLog(); });
 
   // ── AI 상담 지원 기반(P4, Sprint 3) — 기존 GET /api/dashboard/ai 재사용 ──
   var aiSupportLoadBtn = document.getElementById('aiSupportLoadBtn');
@@ -836,10 +881,16 @@
   applyUserBtn.addEventListener('click', function () {
     var userId = currentUserId();
     if (userId) localStorage.setItem(USER_ID_KEY, userId);
+    updateCurrentUserBadge();
     loadDashboard();
   });
   loadBtn.addEventListener('click', function () { load(true); }); // 필터 변경 후 조회 → 1페이지로 초기화
+  // Sprint 3 Commit 5: 검색창에서 Enter로 바로 조회(버튼 클릭 없이).
+  searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') load(true); });
+  userIdInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') applyUserBtn.click(); });
+
   checkHealth();
+  updateCurrentUserBadge();
   if (currentUserId()) loadDashboard();
 })();
 </script>
