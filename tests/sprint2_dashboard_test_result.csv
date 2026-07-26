@@ -1,0 +1,26 @@
+﻿테스트명,결과,상세
+summary 액션이 _READONLY_ACTIONS에 등록됨(쓰기 아님),PASS,
+get_summary 정상 파싱,PASS,"{'date': '2026-07-26', 'total': 3, 'byStatus': {'PENDING_APPROVAL': 2, 'CONFIRMED': 1}, 'byRoom': {}, 'byPayment': {}, 'byDoctor': {}, 'totalEstimatedCost': 0}"
+get_summary action=summary 전달,PASS,
+get_summary date 미지정 시 파라미터 생략(GAS 기본값=오늘 위임),PASS,
+get_summary date 지정 시 전달,PASS,
+헤더 없이 조회 → 401,PASS,
+정상 조회 → 200,PASS,200
+system.fastapi = ok,PASS,
+system.sheetsIntegration = connected,PASS,
+summary.total 반영,PASS,
+summaryError 없음(정상 시),PASS,
+recentReservations 최근 5건만 반환(전체 7건 중),PASS,5
+recentReservations 마스킹 적용,PASS,
+recentReservations 원본 phone 미노출,PASS,
+summary만 실패해도 200 응답,PASS,200
+"summaryError 채워짐, recentReservations는 정상",PASS,
+recent만 실패해도 200 응답,PASS,200
+"recentReservationsError 채워짐, summary는 정상",PASS,
+전체 미설정 상태에서도 200 응답(오류 정보 포함),PASS,200
+system.sheetsIntegration = not_configured,PASS,
+기존 /api/health 정상 동작(무영향),PASS,
+기존 /api/admin-portal/health 정상 동작(무영향),PASS,
+"기존 /api/admin/schedules 정상 동작(같은 /api/admin Namespace, 충돌 없음)",PASS,
+기존 /api/admin/users 정상 동작(충돌 없음),PASS,
+기존 /api/reservations 인증 필요 그대로 유지(무영향),PASS,

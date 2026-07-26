@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Single Admin Portal(기반, Sprint 1) | CMC Health Screening Platform</title>
+<title>Single Admin Portal(Sprint 2) | CMC Health Screening Platform</title>
 <style>
   :root { --primary:#1a4f8a; --gray-100:#f5f7fa; --gray-300:#dde3ea; --gray-500:#8a94a3;
           --danger:#c0392b; --ok:#1e8e5a; --warn:#b8860b; }
@@ -17,7 +17,13 @@
   .badge-warn { background: var(--warn); color: #fff; }
   .badge-err { background: var(--danger); color: #fff; }
   .badge-unknown { background: var(--gray-500); color: #fff; }
+  nav.tabs { background: #fff; border-bottom: 1px solid var(--gray-300); padding: 0 20px; display: flex; gap: 4px; }
+  nav.tabs button { border: none; background: none; padding: 12px 16px; font-size: 13px; cursor: pointer;
+                     color: var(--gray-500); border-bottom: 3px solid transparent; }
+  nav.tabs button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
   main { padding: 16px 20px; }
+  .view { display: none; }
+  .view.active { display: block; }
   .notice { background: #fff8e1; border: 1px solid #f0d878; border-radius: 6px; padding: 10px 14px;
             font-size: 13px; color: #6b5900; margin-bottom: 14px; }
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
@@ -34,18 +40,31 @@
   .state-box { background: #fff; border: 1px solid var(--gray-300); border-radius: 8px; padding: 30px;
                text-align: center; color: var(--gray-500); font-size: 14px; }
   .state-box.error { color: var(--danger); border-color: var(--danger); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: #fff; border: 1px solid var(--gray-300); border-radius: 8px; padding: 14px; }
+  .card .label { font-size: 12px; color: var(--gray-500); margin-bottom: 6px; }
+  .card .value { font-size: 24px; font-weight: 700; color: var(--primary); }
+  .panel { background: #fff; border: 1px solid var(--gray-300); border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+  .panel h2 { font-size: 14px; margin: 0 0 10px; color: #444; }
+  .status-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px dashed var(--gray-300); }
+  .status-row:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
 <header>
-  <h1>🏥 Single Admin Portal <span style="font-weight:400;opacity:.85">— 조회 전용 기반(Sprint 1)</span></h1>
+  <h1>🏥 Single Admin Portal <span style="font-weight:400;opacity:.85">— 조회 전용 통합(Sprint 2)</span></h1>
   <span id="connBadge" class="badge badge-unknown">연결 확인 중…</span>
 </header>
 
+<nav class="tabs">
+  <button data-view="dashboard" class="active">Dashboard</button>
+  <button data-view="reservations">예약조회</button>
+</nav>
+
 <main>
   <div class="notice">
-    이 화면은 <b>Single Admin Portal의 조회 전용 기반(foundation)</b>입니다. 승인·상태변경 등 쓰기 기능은
-    이번 Sprint 범위가 아니며, 기존 관리자 화면(<code>admin_reservations_v2_new.html</code>,
+    이 화면은 <b>Single Admin Portal(조회 전용, 통합 진행 중)</b>입니다. 승인·상태변경 등 쓰기 기능은
+    범위 밖이며, 기존 관리자 화면(<code>admin_reservations_v2_new.html</code>,
     <code>admin/index.html</code>, <code>admin_dashboard_v3_new.html</code>)은 변경 없이 그대로 사용됩니다.
     이 화면에 표시되는 개인정보는 서버에서 마스킹되어 전달됩니다.
   </div>
@@ -55,31 +74,57 @@
       <label for="userIdInput">직원 ID(X-User-Id)</label><br>
       <input type="text" id="userIdInput" placeholder="예: USR-0002">
     </div>
-    <div>
-      <label for="statusSelect">상태</label><br>
-      <select id="statusSelect">
-        <option value="">전체</option>
-        <option value="PENDING_APPROVAL">승인대기</option>
-        <option value="CONFIRMED">확정</option>
-        <option value="REJECTED">거절</option>
-        <option value="CANCELLED">취소</option>
-        <option value="COMPLETED">완료</option>
-      </select>
-    </div>
-    <div>
-      <label for="dateFromInput">희망일(시작)</label><br>
-      <input type="date" id="dateFromInput">
-    </div>
-    <div>
-      <label for="dateToInput">희망일(종료)</label><br>
-      <input type="date" id="dateToInput">
-    </div>
-    <button id="loadBtn" style="align-self:flex-end">조회</button>
+    <button id="applyUserBtn" style="align-self:flex-end">적용</button>
   </div>
 
-  <div id="resultArea">
-    <div class="state-box">직원 ID를 입력하고 "조회"를 눌러주세요.</div>
-  </div>
+  <section id="view-dashboard" class="view active">
+    <div class="cards" id="dashCards">
+      <div class="card"><div class="label">오늘 예약(총)</div><div class="value" id="dashTotal">-</div></div>
+    </div>
+    <div class="panel">
+      <h2>예약 상태 (오늘)</h2>
+      <div id="dashByStatus" class="state-box">직원 ID를 적용하면 표시됩니다.</div>
+    </div>
+    <div class="panel">
+      <h2>최근 예약</h2>
+      <div id="dashRecent" class="state-box">직원 ID를 적용하면 표시됩니다.</div>
+    </div>
+    <div class="panel">
+      <h2>시스템 상태</h2>
+      <div id="dashSystem">
+        <div class="status-row"><span>FastAPI(Business Service Layer)</span><span id="sysFastapi">확인 중…</span></div>
+        <div class="status-row"><span>Google Apps Script / Sheets 연동</span><span id="sysSheets">확인 중…</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-reservations" class="view">
+    <div class="toolbar">
+      <div>
+        <label for="statusSelect">상태</label><br>
+        <select id="statusSelect">
+          <option value="">전체</option>
+          <option value="PENDING_APPROVAL">승인대기</option>
+          <option value="CONFIRMED">확정</option>
+          <option value="REJECTED">거절</option>
+          <option value="CANCELLED">취소</option>
+          <option value="COMPLETED">완료</option>
+        </select>
+      </div>
+      <div>
+        <label for="dateFromInput">희망일(시작)</label><br>
+        <input type="date" id="dateFromInput">
+      </div>
+      <div>
+        <label for="dateToInput">희망일(종료)</label><br>
+        <input type="date" id="dateToInput">
+      </div>
+      <button id="loadBtn" style="align-self:flex-end">조회</button>
+    </div>
+    <div id="resultArea">
+      <div class="state-box">직원 ID를 입력하고 "조회"를 눌러주세요.</div>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -88,11 +133,14 @@
   // 기존 admin/admin_api.js와 동일한 패턴: 정적 서버(예: 4000)와 API 서버(8600)가
   // 다른 포트로 분리 운영되므로 절대 URL을 사용한다. ?api= 쿼리로 재정의 가능.
   var _params = new URLSearchParams(location.search);
-  var API_BASE = (_params.get('api') || 'http://localhost:8600') + '/api/admin-portal';
+  var API_ROOT = _params.get('api') || 'http://localhost:8600';
+  var PORTAL_BASE = API_ROOT + '/api/admin-portal';   // Sprint 1 기존 Namespace
+  var ADMIN_BASE = API_ROOT + '/api/admin';           // Sprint 2 신규 Namespace(PM 결정사항 2)
   var USER_ID_KEY = 'cshsp_admin_portal_user_id';
 
   var connBadge = document.getElementById('connBadge');
   var userIdInput = document.getElementById('userIdInput');
+  var applyUserBtn = document.getElementById('applyUserBtn');
   var statusSelect = document.getElementById('statusSelect');
   var dateFromInput = document.getElementById('dateFromInput');
   var dateToInput = document.getElementById('dateToInput');
@@ -107,6 +155,19 @@
     });
   }
 
+  function currentUserId() { return userIdInput.value.trim(); }
+
+  // ── 탭 전환 (기존 admin/index.html의 data-view 패턴 재사용) ──
+  document.querySelectorAll('nav.tabs button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('nav.tabs button').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('view-' + btn.dataset.view).classList.add('active');
+      if (btn.dataset.view === 'dashboard') loadDashboard();
+    });
+  });
+
   function setConnBadge(state, text) {
     connBadge.className = 'badge badge-' + state;
     connBadge.textContent = text;
@@ -117,7 +178,7 @@
   }
 
   function checkHealth() {
-    fetch(API_BASE + '/health')
+    fetch(PORTAL_BASE + '/health')
       .then(function (r) { return r.json(); })
       .then(function (body) {
         if (body.sheetsIntegration === 'connected') {
@@ -133,6 +194,65 @@
       });
   }
 
+  // ── Dashboard(P1) ──────────────────────────────────
+  function renderDashByStatus(summary, err) {
+    var el = document.getElementById('dashByStatus');
+    if (err) { el.className = 'state-box error'; el.textContent = err; return; }
+    if (!summary || !summary.byStatus || !Object.keys(summary.byStatus).length) {
+      el.className = 'state-box'; el.textContent = '오늘 예약이 없습니다.'; return;
+    }
+    var rows = Object.keys(summary.byStatus).map(function (k) {
+      return '<div class="status-row"><span>' + esc(k) + '</span><span>' + esc(summary.byStatus[k]) + '건</span></div>';
+    }).join('');
+    el.className = ''; el.innerHTML = rows;
+  }
+
+  function renderDashRecent(list, err) {
+    var el = document.getElementById('dashRecent');
+    if (err) { el.className = 'state-box error'; el.textContent = err; return; }
+    if (!list || !list.length) { el.className = 'state-box'; el.textContent = '예약이 없습니다.'; return; }
+    var head = '<tr><th>예약번호</th><th>성명</th><th>프로그램</th><th>희망일</th><th>상태</th></tr>';
+    var body = list.map(function (r) {
+      return '<tr><td>' + esc(r.reservationNo) + '</td><td>' + esc(r.name) + '</td><td>'
+        + esc(r.program) + '</td><td>' + esc(r.wishDate) + '</td><td>' + esc(r.status) + '</td></tr>';
+    }).join('');
+    el.className = ''; el.innerHTML = '<table>' + head + body + '</table>';
+  }
+
+  function loadDashboard() {
+    var userId = currentUserId();
+    if (!userId) {
+      document.getElementById('dashByStatus').textContent = '직원 ID를 입력하고 "적용"을 눌러주세요.';
+      document.getElementById('dashRecent').textContent = '직원 ID를 입력하고 "적용"을 눌러주세요.';
+      return;
+    }
+    fetch(ADMIN_BASE + '/dashboard', { headers: { 'X-User-Id': userId } })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (!r.ok) throw new Error('Dashboard 조회 실패(HTTP ' + r.status + ')');
+        return r.json();
+      })
+      .then(function (body) {
+        document.getElementById('sysFastapi').textContent =
+          body.system && body.system.fastapi === 'ok' ? '🟢 정상' : '🔴 오류';
+        var sh = body.system && body.system.sheetsIntegration;
+        document.getElementById('sysSheets').textContent =
+          sh === 'connected' ? '🟢 정상' : (sh === 'not_configured' ? '⚪ 미설정' : '🔴 오류');
+
+        document.getElementById('dashTotal').textContent =
+          body.summary ? body.summary.total : (body.summaryError ? '오류' : '-');
+        renderDashByStatus(body.summary, body.summaryError && body.summaryError.message);
+        renderDashRecent(body.recentReservations, body.recentReservationsError && body.recentReservationsError.message);
+      })
+      .catch(function (err) {
+        document.getElementById('dashByStatus').className = 'state-box error';
+        document.getElementById('dashByStatus').textContent = err.message || '알 수 없는 오류';
+        document.getElementById('dashRecent').className = 'state-box error';
+        document.getElementById('dashRecent').textContent = err.message || '알 수 없는 오류';
+      });
+  }
+
+  // ── 예약조회(P2, Sprint 1 기능 유지) ──────────────────
   function renderTable(rows) {
     if (!rows.length) {
       showState('조회된 예약이 없습니다.');
@@ -156,12 +276,11 @@
   }
 
   function load() {
-    var userId = userIdInput.value.trim();
+    var userId = currentUserId();
     if (!userId) {
       showState('직원 ID를 입력해 주세요.', true);
       return;
     }
-    localStorage.setItem(USER_ID_KEY, userId);
 
     var params = new URLSearchParams();
     if (statusSelect.value) params.set('status', statusSelect.value);
@@ -171,7 +290,7 @@
     loadBtn.disabled = true;
     showState('조회 중…');
 
-    fetch(API_BASE + '/reservations?' + params.toString(), { headers: { 'X-User-Id': userId } })
+    fetch(PORTAL_BASE + '/reservations?' + params.toString(), { headers: { 'X-User-Id': userId } })
       .then(function (r) {
         if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
         if (r.status === 503) throw new Error('Sheets 연동이 설정되지 않았습니다. 관리자에게 문의하세요.');
@@ -184,8 +303,14 @@
       .finally(function () { loadBtn.disabled = false; });
   }
 
+  applyUserBtn.addEventListener('click', function () {
+    var userId = currentUserId();
+    if (userId) localStorage.setItem(USER_ID_KEY, userId);
+    loadDashboard();
+  });
   loadBtn.addEventListener('click', load);
   checkHealth();
+  if (currentUserId()) loadDashboard();
 })();
 </script>
 </body>

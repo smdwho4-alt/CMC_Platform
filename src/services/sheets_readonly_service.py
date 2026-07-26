@@ -1,8 +1,12 @@
-"""Sheets 조회 전용 서비스 — Business Service Layer 최소 연동 경로 (Sprint 1).
+"""Sheets 조회 전용 서비스 — Business Service Layer 최소 연동 경로 (Sprint 1~2).
 
 Google Apps Script(Integration Layer, app/apps_script/sheets_api_v3_final.gs)의
-조회 전용 액션(ping/list/get)만 호출한다. 쓰기 액션(create/updateStatus/updateOps/update)은
-이 모듈에서 절대 호출하지 않는다 — Sprint 1 범위는 조회 전용이다(PM 승인 제외범위).
+조회 전용 액션(ping/list/get/summary)만 호출한다. 쓰기 액션(create/updateStatus/
+updateOps/update)은 이 모듈에서 절대 호출하지 않는다(PM 승인 제외범위).
+
+Sprint 2 Commit 1: get_summary() 추가 — GAS의 기존 _actionSummary(당일 집계)를
+그대로 호출한다. PM 결정사항 6("FastAPI가 직접 계산하지 않는다, GAS summary 결과를
+가공") — 이 함수는 GAS 응답을 그대로 반환하며 통계 재계산을 하지 않는다.
 
 연동 URL은 코드에 하드코딩하지 않고 환경변수(CSHSP_GAS_WEBAPP_URL)에서 읽는다.
 (Enterprise_Architecture_ToBe_v1.0.md §8 "연동 정보 중앙화" 원칙 준수 — 클라이언트 코드에
@@ -21,7 +25,7 @@ import requests
 
 GAS_WEBAPP_URL_ENV = "CSHSP_GAS_WEBAPP_URL"
 _TIMEOUT_SECONDS = 10
-_READONLY_ACTIONS = ("ping", "list", "get")
+_READONLY_ACTIONS = ("ping", "list", "get", "summary")
 # GAS _actionList가 실제로 지원하는 필터 파라미터만 화이트리스트로 허용한다
 # (app/apps_script/sheets_api_v3_final.gs :: _actionList 확인 근거).
 _LIST_FILTER_KEYS = ("status", "dateFrom", "dateTo")
@@ -90,3 +94,15 @@ def get_reservation(reservation_no: str, *, session=None) -> dict[str, Any] | No
         raise ValueError("reservation_no는 필수입니다.")
     body = _call_gas("get", {"no": reservation_no}, session=session)
     return body.get("data")
+
+
+def get_summary(date: str = "", *, session=None) -> dict[str, Any]:
+    """일자별 운영 현황 요약(action=summary). GAS _actionSummary를 그대로 호출·반환한다.
+
+    GAS 응답 형태(sheets_api_v3_final.gs :: _actionSummary 확인):
+    {date, total, byStatus, byRoom, byPayment, byDoctor, totalEstimatedCost}
+    date를 생략하면 GAS가 자체적으로 오늘 날짜를 기본값으로 사용한다.
+    """
+    params = {"date": date} if date else {}
+    body = _call_gas("summary", params, session=session)
+    return body.get("data", {})

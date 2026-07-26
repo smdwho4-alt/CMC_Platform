@@ -153,8 +153,10 @@ def create_app(data_dir: str | Path | None = None, include_agents: bool = True,
     # Sprint 1: Single Admin Portal 조회 전용 라우터(Enterprise_Architecture_ToBe_v1.0.md §4)
     # 기존 라우트/미들웨어/Startup은 변경하지 않고, routes_agents와 동일한 include_router
     # 패턴으로 신규 라우터만 등록한다.
-    from routes_admin_portal import create_admin_portal_router
+    from routes_admin_portal import create_admin_portal_router, create_admin_namespace_router
     app.include_router(create_admin_portal_router(DATA_DIR))
+    # Sprint 2: 신규 Endpoint 전용 Namespace(/api/admin/*, PM 결정사항 2) — 별도 라우터로 등록
+    app.include_router(create_admin_namespace_router(DATA_DIR))
 
     # ── Mock 인증/권한 ──
     def require_user(x_user_id: str | None = Header(default=None)) -> dict[str, Any]:
