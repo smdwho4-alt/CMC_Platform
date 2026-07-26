@@ -1,0 +1,12 @@
+﻿구분,스크립트,결과,비고
+기존 Sprint A(Core Data Layer),run_sprint_a_tests.py,PASS,
+기존 Sprint B(Reservation Engine),run_sprint_b_tests.py,PASS,
+"기존 Sprint D(API Layer, api_server.py 직접 검증)",run_sprint_d_tests.py,PASS,
+기존 Sprint E(AI Agent),run_sprint_e_tests.py,PASS,
+기존 Sprint F(Chat Widget),run_sprint_f_tests.py,PASS,
+기존 Sprint G(Claude 연동),run_sprint_g_tests.py,"FAIL(기존 결함, Sprint1 무관 확인됨)","Sprint 1 이전부터 존재. git stash로 api_server.py 변경분을 제거하고 재실행해도 동일하게 실패함을 확인(questionnaires/start 응답 스키마 이슈로 추정, Sprint 1 범위 밖)."
+기존 Sprint H(운영 전환),run_sprint_h_tests.py,PASS,
+기존 Sprint I(품질 게이트),run_sprint_i_quality_gate.py,"FAIL(기존 결함, Sprint1 무관 확인됨)","스크립트 자체의 print()가 Windows cp949 콘솔에서 인코딩 불가한 문자(em-dash 등)를 출력하려다 크래시. Sprint1_query_layer/portal_shell 테스트에서 동일 클래스의 버그를 발견·수정한 바 있으나, 이 파일은 Sprint 1에서 수정 대상이 아니므로 원본 그대로 둠."
+Sprint 1 Commit 1(조회 계층),run_sprint1_query_layer_qa.py,PASS,
+Sprint 1 Commit 2(관리자 조회 API),run_sprint1_admin_portal_api_qa.py,PASS,
+Sprint 1 Commit 3(Portal 셸),run_sprint1_portal_shell_qa.py,PASS,
