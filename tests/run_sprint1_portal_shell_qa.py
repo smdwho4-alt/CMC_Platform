@@ -43,10 +43,13 @@ check("API_BASE가 절대 URL(http://localhost:8600) 기반", "http://localhost:
 check("API_BASE가 ?api= 재정의 지원(admin_api.js와 동일 패턴)", "_params.get('api')" in html)
 check("admin-portal API 엔드포인트 참조", "/api/admin-portal" in html)
 
-# 조회 전용 — 쓰기 액션 코드가 전혀 없어야 함
-for forbidden in ("action=create", "action=update", "action=updateStatus", "action=updateOps",
-                   "method: 'POST'", "method:'POST'"):
-    check(f"쓰기 관련 코드 미포함: {forbidden!r}", forbidden not in html)
+# Sheets/GAS 조회 전용 원칙 — 이 부분은 Sprint 1~3 전체에서 예외 없이 유지된다.
+# (일반 POST 사용 자체는 Sprint 3 Commit 2에서 PM이 승인한 CRM 상태변경에 한해
+# 허용됐다 — 그 범위 검증은 tests/run_sprint3_crm_qa.py가 전담한다. 이 파일은
+# Sprint 1 당시의 "페이지 전체가 완전 조회 전용"이라는 원 가정을 더 이상
+# 주장하지 않고, Sheets/GAS 관련 쓰기 action만 계속 금지 대상으로 확인한다.)
+for forbidden in ("action=create", "action=update", "action=updateStatus", "action=updateOps"):
+    check(f"Sheets/GAS 쓰기 action 코드 미포함: {forbidden!r}", forbidden not in html)
 
 # 오류 처리(PM 확정범위 4번: 조회실패/빈데이터/네트워크오류)
 check("401 처리 코드 존재", "401" in html)

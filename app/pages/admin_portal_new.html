@@ -71,6 +71,7 @@
   <button data-view="dashboard" class="active">Dashboard</button>
   <button data-view="reservations">예약조회</button>
   <button data-view="statistics">통계</button>
+  <button data-view="consultations">상담관리</button>
 </nav>
 
 <main>
@@ -183,6 +184,38 @@
       <div id="statByDate" class="state-box">조회를 눌러주세요.</div>
     </div>
   </section>
+
+  <section id="view-consultations" class="view">
+    <div class="notice">
+      상담(CRM) 상태는 <b>OPEN → IN_PROGRESS → CLOSED 순차 전이만</b> 가능합니다. 상담 생성·삭제,
+      예약·고객정보 수정 기능은 이 화면에 없습니다(범위 밖). 상담원(홍○○ 형태)/병원장(전체이름)/
+      관리자(원문) 등 역할에 따라 이름 표시 수준이 다르며, 상담 요약 내용은 항상 그대로 표시됩니다.
+    </div>
+    <div class="toolbar">
+      <div>
+        <label for="crmStatusSelect">상태</label><br>
+        <select id="crmStatusSelect">
+          <option value="">전체</option>
+          <option value="OPEN">OPEN</option>
+          <option value="IN_PROGRESS">IN_PROGRESS</option>
+          <option value="CLOSED">CLOSED</option>
+        </select>
+      </div>
+      <div>
+        <label for="crmChannelSelect">경로</label><br>
+        <select id="crmChannelSelect">
+          <option value="">전체</option>
+          <option value="AI_CHAT">AI 채팅</option>
+          <option value="CALL">전화</option>
+          <option value="SMS">문자</option>
+        </select>
+      </div>
+      <button id="crmLoadBtn" style="align-self:flex-end">조회</button>
+    </div>
+    <div id="crmResultArea">
+      <div class="state-box">직원 ID를 입력하고 "조회"를 눌러주세요.</div>
+    </div>
+  </section>
 </main>
 
 <!-- 예약상세(P3) — 조회 전용 모달. Sprint 1 기존 엔드포인트(/api/admin-portal/reservations/{no})를
@@ -259,6 +292,7 @@
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if (btn.dataset.view === 'dashboard') loadDashboard();
       if (btn.dataset.view === 'statistics') loadStatistics();
+      if (btn.dataset.view === 'consultations') loadConsultations();
     });
   });
 
@@ -414,6 +448,94 @@
   }
 
   statLoadBtn.addEventListener('click', loadStatistics);
+
+  // ── 상담관리(P2, Sprint 3) — 기존 crm.json 재사용, 상태전이만 가능 ──
+  var crmStatusSelect = document.getElementById('crmStatusSelect');
+  var crmChannelSelect = document.getElementById('crmChannelSelect');
+  var crmLoadBtn = document.getElementById('crmLoadBtn');
+  var crmResultArea = document.getElementById('crmResultArea');
+  var CRM_NEXT_STATUS = { OPEN: 'IN_PROGRESS', IN_PROGRESS: 'CLOSED' }; // CLOSED는 종결(다음 없음)
+
+  function showCrmState(message, isError) {
+    crmResultArea.innerHTML = '<div class="state-box' + (isError ? ' error' : '') + '">' + esc(message) + '</div>';
+  }
+
+  function renderConsultations(rows) {
+    if (!rows.length) { showCrmState('조회된 상담이 없습니다.'); return; }
+    var head = '<tr><th>ID</th><th>고객명</th><th>경로</th><th>구분</th><th>요약</th>'
+             + '<th>상태</th><th>담당자</th><th>작업</th></tr>';
+    var body = rows.map(function (r) {
+      var next = CRM_NEXT_STATUS[r.status];
+      var actionCell = next
+        ? '<button class="crm-advance-btn" data-id="' + esc(r.id) + '" data-next="' + esc(next) + '">'
+          + esc(r.status) + ' → ' + esc(next) + '</button>'
+        : '<span style="color:var(--gray-500)">종결됨</span>';
+      return '<tr>'
+        + '<td>' + esc(r.id) + '</td>'
+        + '<td>' + esc(r.patientName) + '</td>'
+        + '<td>' + esc(r.channel) + '</td>'
+        + '<td>' + esc(r.category) + '</td>'
+        + '<td>' + esc(r.summary) + '</td>'
+        + '<td>' + esc(r.status) + '</td>'
+        + '<td>' + esc(r.handledBy || '-') + '</td>'
+        + '<td>' + actionCell + '</td>'
+        + '</tr>';
+    }).join('');
+    crmResultArea.innerHTML = '<table>' + head + body + '</table>';
+  }
+
+  function loadConsultations() {
+    var userId = currentUserId();
+    if (!userId) { showCrmState('직원 ID를 입력해 주세요.', true); return; }
+
+    var params = new URLSearchParams();
+    if (crmStatusSelect.value) params.set('status', crmStatusSelect.value);
+    if (crmChannelSelect.value) params.set('channel', crmChannelSelect.value);
+
+    crmLoadBtn.disabled = true;
+    showCrmState('조회 중…');
+
+    fetch(ADMIN_BASE + '/consultations?' + params.toString(), { headers: { 'X-User-Id': userId } })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
+        if (!r.ok) throw new Error('상담 조회 실패(HTTP ' + r.status + ')');
+        return r.json();
+      })
+      .then(function (body) { renderConsultations(body.data || []); })
+      .catch(function (err) { showCrmState(err.message || '알 수 없는 오류가 발생했습니다.', true); })
+      .finally(function () { crmLoadBtn.disabled = false; });
+  }
+
+  function advanceConsultation(id, nextStatus, btn) {
+    var userId = currentUserId();
+    if (!userId) return;
+    btn.disabled = true;
+    fetch(ADMIN_BASE + '/consultations/' + encodeURIComponent(id) + '/status', {
+      method: 'POST',
+      headers: { 'X-User-Id': userId, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: nextStatus }),
+    })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
+        return r.json().then(function (b) {
+          if (!r.ok) throw new Error(b.detail || ('상태변경 실패(HTTP ' + r.status + ')'));
+          return b;
+        });
+      })
+      .then(function () { loadConsultations(); })
+      .catch(function (err) {
+        btn.disabled = false;
+        alert(err.message || '알 수 없는 오류가 발생했습니다.');
+      });
+  }
+
+  crmLoadBtn.addEventListener('click', loadConsultations);
+  crmResultArea.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.crm-advance-btn') : null;
+    if (btn) advanceConsultation(btn.dataset.id, btn.dataset.next, btn);
+  });
 
   // ── 예약조회(P2, Sprint 1 기능 유지) ──────────────────
   function renderTable(rows) {

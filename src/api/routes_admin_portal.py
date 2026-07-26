@@ -29,14 +29,18 @@ from typing import Any
 
 _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parents[1]
-for _p in ("core", "services"):
+for _p in ("core", "services", "reservation"):
     sys.path.insert(0, str(_ROOT / "src" / _p))
+sys.path.insert(0, str(_HERE))  # file_lock.py (같은 src/api/ 디렉터리)
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 import core_data_loader as loader  # noqa: E402
 import pii_mask  # noqa: E402
 import sheets_readonly_service as sheets  # noqa: E402
+from file_lock import DataLock  # noqa: E402
+from json_store import now_iso, read_doc, write_doc  # noqa: E402
 
 
 def _build_require_user(data_dir: Path):
@@ -92,6 +96,48 @@ def _date_range(date_from: str, date_to: str) -> list[str]:
     if days > _MAX_STAT_DAYS:
         raise ValueError(f"조회 기간이 너무 깁니다(최대 {_MAX_STAT_DAYS}일). 기간을 좁혀 주세요.")
     return [(d1 + _dt.timedelta(days=i)).isoformat() for i in range(days)]
+
+
+# ── Sprint 3 Commit 2: CRM 통합(상담관리) — 기존 crm.json 스키마 그대로 재사용 ──
+# PM 결정사항: CRM을 새로 만들지 않는다. 기존 crm_agent.py/POST /api/crm/notifications가
+# 이미 만들어 둔 crm.json 레코드를 조회·상태변경만 한다. 생성(POST 신규 티켓)·삭제
+# 기능은 이번 Sprint 범위에 없다(기존 생성 경로는 /api/crm/notifications 그대로 유지).
+_CRM_STATUS_ORDER = ["OPEN", "IN_PROGRESS", "CLOSED"]  # 순차 전이만 허용(역행 금지)
+
+
+class ConsultationStatusBody(BaseModel):
+    status: str
+    handledBy: str | None = None
+
+
+def _crm_masking_tier(user: dict[str, Any]) -> str:
+    """PM 승인 3단계 마스킹 정책 — 역할별 조회 수준.
+    ROLE-ADMIN=admin(원문), ROLE-DIRECTOR=supervisor(전체이름), 그 외=operator(마스킹).
+    새 역할이 추가되면 기본값은 가장 보수적인 'operator'로 떨어진다(안전한 기본값)."""
+    role_id = user.get("roleId")
+    if role_id == "ROLE-ADMIN":
+        return "admin"
+    if role_id == "ROLE-DIRECTOR":
+        return "supervisor"
+    return "operator"
+
+
+def _mask_name_by_tier(name: str | None, tier: str) -> str | None:
+    if not name:
+        return name
+    if tier in ("admin", "supervisor"):
+        return name  # PM 예시: Admin=원문, Supervisor=전체이름(둘 다 마스킹 없음 — 현재 CRM에는
+                     # 이름 외 다른 PII 필드가 없어 이 두 단계가 결과적으로 동일하게 보임)
+    return pii_mask.mask_name(name)  # operator: 홍○○
+
+
+def _patient_name_map(data_dir: Path) -> dict[str, str]:
+    """patientId -> name (patients.json, 존재하지 않으면 빈 dict)."""
+    try:
+        patients = loader.load_entity("Patient", data_dir)
+    except Exception:  # noqa: BLE001 — 조회 실패 시 이름 없이 진행(치명적 오류 아님)
+        return {}
+    return {p.get("id"): p.get("name") for p in patients if p.get("id")}
 
 
 def _sheets_connection_status() -> tuple[str, str | None]:
@@ -177,10 +223,16 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     Sprint 2 Commit 1: GET /api/admin/dashboard
     Sprint 2 Commit 4: GET /api/admin/statistics
     Sprint 3 Commit 1: 권한 검사 추가(PM 결정사항 7).
+    Sprint 3 Commit 2: GET /api/admin/consultations, POST /api/admin/consultations/{id}/status
     """
     router = APIRouter(prefix="/api/admin", tags=["admin-dashboard"])
     require_dashboard_view = _build_require_permission(data_dir, "dashboard:view")
     require_statistics_view = _build_require_permission(data_dir, "statistics:view")
+    # crm:manage(ROLE-CRM/ROLE-ADMIN) 또는 crm:log(ROLE-AI-AGENT, 조회만) 또는
+    # audit:view(ROLE-DIRECTOR, 운영 감독 목적의 조회)가 있으면 상담 목록을 볼 수 있다.
+    # 상태변경(쓰기)은 아래에서 crm:manage만 별도로 요구한다(더 엄격).
+    require_consultation_view = _build_require_permission(data_dir, "crm:manage", "crm:log", "audit:view")
+    require_consultation_manage = _build_require_permission(data_dir, "crm:manage")
 
     @router.get("/dashboard")
     def dashboard(user: dict[str, Any] = Depends(require_dashboard_view)):
@@ -271,6 +323,99 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
             "byStatus": by_status,
             "byDate": by_date,
             "dayErrors": day_errors,
+        }
+
+    @router.get("/consultations")
+    def list_consultations(
+        status: str = Query(default=""),
+        channel: str = Query(default=""),
+        user: dict[str, Any] = Depends(require_consultation_view),
+    ):
+        """상담(CRM) 목록 조회 — 기존 crm.json 재사용, 신규 모델 없음(PM 결정사항 1).
+        channel 필터는 Sprint 3 Commit 4(AI 지원 기반)에서 channel=AI_CHAT으로
+        AI가 생성한 상담만 걸러보는 데 사용될 예정이며, 이번 Commit에서 이미
+        지원해 둔다(신규 엔드포인트 추가 없이 파라미터만 재사용)."""
+        doc = read_doc(data_dir / "crm.json")
+        records = doc.get("records", [])
+        if status:
+            records = [r for r in records if r.get("status") == status]
+        if channel:
+            records = [r for r in records if r.get("channel") == channel]
+
+        tier = _crm_masking_tier(user)
+        names = _patient_name_map(data_dir)
+        result = []
+        for r in records:
+            result.append({
+                "id": r.get("id"),
+                "patientId": r.get("patientId"),
+                "patientName": _mask_name_by_tier(names.get(r.get("patientId")), tier),
+                "reservationId": r.get("reservationId"),
+                "channel": r.get("channel"),
+                "direction": r.get("direction"),
+                "category": r.get("category"),
+                "summary": r.get("summary"),  # PM 결정사항 4: summary는 원문 그대로(마스킹 안 함)
+                "handledBy": r.get("handledBy"),
+                "followUpDate": r.get("followUpDate"),
+                "status": r.get("status"),
+                "createdAt": r.get("createdAt"),
+                "updatedAt": r.get("updatedAt"),
+            })
+        return {"ok": True, "count": len(result), "data": result, "maskingTier": tier}
+
+    @router.post("/consultations/{consultation_id}/status")
+    def update_consultation_status(
+        consultation_id: str, body: ConsultationStatusBody,
+        user: dict[str, Any] = Depends(require_consultation_manage),
+    ):
+        """상담 상태 변경 — OPEN→IN_PROGRESS→CLOSED 순차 전이만 허용(PM 승인 범위).
+        CRM 생성·삭제, 예약 수정·삭제, 고객정보 수정은 이 엔드포인트에서 다루지
+        않는다(PM 결정사항 2 금지 목록). 상태값 외 다른 필드(summary/category 등)는
+        이 엔드포인트로 변경할 수 없다."""
+        if body.status not in _CRM_STATUS_ORDER:
+            raise HTTPException(400, f"허용되지 않은 상태값: {body.status} (허용: {_CRM_STATUS_ORDER})")
+
+        with DataLock(data_dir):
+            doc = read_doc(data_dir / "crm.json")
+            records = doc.get("records", [])
+            rec = next((r for r in records if r.get("id") == consultation_id), None)
+            if rec is None:
+                raise HTTPException(404, f"상담 없음: {consultation_id}")
+
+            current = rec.get("status", "OPEN")
+            if current not in _CRM_STATUS_ORDER:
+                raise HTTPException(409, f"알 수 없는 현재 상태: {current}")
+            cur_idx = _CRM_STATUS_ORDER.index(current)
+            new_idx = _CRM_STATUS_ORDER.index(body.status)
+            if new_idx != cur_idx + 1:
+                raise HTTPException(
+                    409,
+                    f"허용되지 않은 상태 전이: {current} → {body.status} "
+                    f"(순차 전이만 허용: {' → '.join(_CRM_STATUS_ORDER)})",
+                )
+
+            if body.handledBy:
+                handler = next((u for u in loader.load_entity("User", data_dir)
+                                 if u.get("id") == body.handledBy), None)
+                if not handler or handler.get("status") != "ACTIVE":
+                    raise HTTPException(400, f"유효하지 않은 담당자: {body.handledBy}")
+                rec["handledBy"] = body.handledBy
+
+            rec["status"] = body.status
+            rec["updatedAt"] = now_iso()
+            write_doc(data_dir / "crm.json", doc)
+
+        tier = _crm_masking_tier(user)
+        names = _patient_name_map(data_dir)
+        return {
+            "ok": True,
+            "data": {
+                "id": rec.get("id"),
+                "patientName": _mask_name_by_tier(names.get(rec.get("patientId")), tier),
+                "status": rec.get("status"),
+                "handledBy": rec.get("handledBy"),
+                "updatedAt": rec.get("updatedAt"),
+            },
         }
 
     return router

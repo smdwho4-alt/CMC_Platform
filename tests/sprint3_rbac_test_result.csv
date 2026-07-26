@@ -20,4 +20,4 @@ AI-AGENT → Statistics 403(statistics:view 미보유),PASS,
 "health는 여전히 인증 없이 접근 가능(의도된 설계, 회귀 아님)",PASS,
 throwIfForbidden 헬퍼 함수 정의됨,PASS,
 throwIfForbidden이 403 상태코드 처리,PASS,
-Dashboard/예약조회/예약상세/통계 4곳 모두 403 처리 연결,PASS,4
+Dashboard/예약조회/예약상세/통계 최소 4곳 403 처리 연결,PASS,6

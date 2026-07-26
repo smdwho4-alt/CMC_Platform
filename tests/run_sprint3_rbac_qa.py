@@ -140,8 +140,11 @@ check("health는 여전히 인증 없이 접근 가능(의도된 설계, 회귀 
 _PORTAL_HTML = (ROOT / "app" / "pages" / "admin_portal_new.html").read_text(encoding="utf-8")
 check("throwIfForbidden 헬퍼 함수 정의됨", "function throwIfForbidden(" in _PORTAL_HTML)
 check("throwIfForbidden이 403 상태코드 처리", "r.status === 403" in _PORTAL_HTML)
-check("Dashboard/예약조회/예약상세/통계 4곳 모두 403 처리 연결",
-      _PORTAL_HTML.count("var forbidden = throwIfForbidden(r);") == 4,
+# 최소 4곳(Dashboard/예약조회/예약상세/통계, Sprint 3 Commit 1 기준)에는 반드시
+# 연결되어 있어야 한다. 이후 Commit(예: Commit 2 상담관리)이 fetch 지점을 추가할
+# 수 있으므로 정확히 4가 아니라 "최소 4"로 검사한다(과도하게 엄격한 고정값 회피).
+check("Dashboard/예약조회/예약상세/통계 최소 4곳 403 처리 연결",
+      _PORTAL_HTML.count("var forbidden = throwIfForbidden(r);") >= 4,
       str(_PORTAL_HTML.count("var forbidden = throwIfForbidden(r);")))
 
 
