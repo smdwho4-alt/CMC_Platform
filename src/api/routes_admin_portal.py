@@ -19,6 +19,7 @@ _build_require_user()로 공유한다.
 """
 from __future__ import annotations
 
+import datetime as _dt
 import sys
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,24 @@ def _build_require_user(data_dir: Path):
             raise HTTPException(401, f"유효하지 않은 사용자: {x_user_id}")
         return user
     return require_user
+
+
+_MAX_STAT_DAYS = 31  # GAS summary를 일자별로 반복 호출하는 상한 — 무제한 호출 방지 안전장치
+
+
+def _date_range(date_from: str, date_to: str) -> list[str]:
+    """'YYYY-MM-DD' 두 값을 받아 그 사이 모든 날짜 목록을 반환한다(순서 무관하게 정렬)."""
+    try:
+        d1 = _dt.date.fromisoformat(date_from)
+        d2 = _dt.date.fromisoformat(date_to)
+    except ValueError as e:
+        raise ValueError(f"날짜 형식이 올바르지 않습니다(YYYY-MM-DD): {e}") from e
+    if d2 < d1:
+        d1, d2 = d2, d1
+    days = (d2 - d1).days + 1
+    if days > _MAX_STAT_DAYS:
+        raise ValueError(f"조회 기간이 너무 깁니다(최대 {_MAX_STAT_DAYS}일). 기간을 좁혀 주세요.")
+    return [(d1 + _dt.timedelta(days=i)).isoformat() for i in range(days)]
 
 
 def _sheets_connection_status() -> tuple[str, str | None]:
@@ -173,6 +192,54 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
             "summaryError": summary_error,
             "recentReservations": recent,
             "recentReservationsError": recent_error,
+        }
+
+    @router.get("/statistics")
+    def statistics(
+        dateFrom: str = Query(default=""), dateTo: str = Query(default=""),
+        user: dict[str, Any] = Depends(require_user),
+    ):
+        """통계(P4) — 예약건수/상태별/기간별, 읽기 전용.
+
+        PM 결정사항 6: FastAPI가 직접 계산하지 않는다. GAS의 기존 summary 액션은
+        단일 날짜만 지원하므로(sheets_api_v3_final.gs :: _actionSummary 확인), 기간
+        통계는 날짜별로 summary를 반복 호출해 그 결과를 합산하는 방식으로 가공한다
+        — 원시 예약 레코드를 직접 집계하지 않고 항상 GAS summary의 출력만 다룬다.
+        dateFrom/dateTo 생략 시 오늘 하루만 조회(Dashboard와 동일 비용).
+        """
+        if dateFrom and dateTo:
+            try:
+                dates = _date_range(dateFrom, dateTo)
+            except ValueError as e:
+                raise HTTPException(400, str(e)) from e
+        else:
+            dates = [""]  # GAS 기본값(오늘)에 위임
+
+        total = 0
+        by_status: dict[str, int] = {}
+        by_date: list[dict[str, Any]] = []
+        day_errors: list[dict[str, str]] = []
+
+        for d in dates:
+            try:
+                s = sheets.get_summary(date=d)
+            except sheets.SheetsIntegrationNotConfigured as e:
+                raise HTTPException(503, str(e)) from e
+            except sheets.SheetsIntegrationError as e:
+                day_errors.append({"date": d, "message": str(e)})
+                continue
+            day_total = s.get("total", 0)
+            total += day_total
+            for k, v in (s.get("byStatus") or {}).items():
+                by_status[k] = by_status.get(k, 0) + v
+            by_date.append({"date": s.get("date", d), "total": day_total})
+
+        return {
+            "ok": True,
+            "totalReservations": total,
+            "byStatus": by_status,
+            "byDate": by_date,
+            "dayErrors": day_errors,
         }
 
     return router

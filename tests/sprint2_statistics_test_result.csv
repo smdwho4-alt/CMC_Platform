@@ -1,0 +1,23 @@
+﻿테스트명,결과,상세
+정상 범위(3일),PASS,
+역순 입력 자동 정렬,PASS,
+동일 날짜(1일),PASS,
+최대 기간(31일) 초과 시 ValueError,PASS,조회 기간이 너무 깁니다(최대 31일). 기간을 좁혀 주세요.
+잘못된 날짜 형식 시 ValueError,PASS,
+헤더 없이 조회 → 401,PASS,
+기간 지정 조회 → 200,PASS,200
+totalReservations = GAS summary 합산(2+3=5),PASS,5
+byStatus 병합(PENDING_APPROVAL 2+1=3),PASS,"{'PENDING_APPROVAL': 3, 'CONFIRMED': 2}"
+byStatus 병합(CONFIRMED=2),PASS,
+byDate 2건(일자별 breakdown),PASS,"[{'date': '2026-07-01', 'total': 2}, {'date': '2026-07-02', 'total': 3}]"
+dayErrors 없음(정상 시),PASS,
+dateFrom/dateTo 미지정 시 오늘 하루만 조회 → 200,PASS,
+미지정 시 byDate 1건(오늘),PASS,"[{'date': 'today', 'total': 0}]"
+기간 너무 김 → 400,PASS,400
+잘못된 날짜 형식 → 400,PASS,
+하루만 실패해도 200 응답,PASS,200
+"실패한 날짜는 dayErrors에 기록, 나머지는 정상 집계",PASS,"{'ok': True, 'totalReservations': 2, 'byStatus': {'PENDING_APPROVAL': 2}, 'byDate': [{'date': '2026-07-01', 'total': 2}], 'dayErrors': [{'date': '2026-07-02', 'message': '일시 오류(테스트)'}]}"
+Sheets 미설정 시 503,PASS,503
+"기존 /api/admin/dashboard 정상 동작(무영향, Namespace 공유)",PASS,
+기존 /api/admin-portal/reservations 정상 동작(무영향),PASS,
+기존 /api/admin/schedules 정상 동작(무영향),PASS,
