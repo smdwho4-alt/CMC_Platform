@@ -1,0 +1,30 @@
+﻿테스트명,결과,상세
+mask_name 3글자,PASS,홍○○
+mask_name 2글자,PASS,김○
+"mask_name 1글자(마스킹 불가, 원본유지)",PASS,
+mask_name 빈값,PASS,
+mask_birth 정상포맷,PASS,1980-**-**
+mask_birth 비정상포맷 전체마스킹,PASS,
+mask_birth 빈값,PASS,
+mask_phone 하이픈포맷,PASS,010-****-5678
+mask_phone 숫자만,PASS,
+mask_phone 짧은값,PASS,
+mask_email 정상포맷,PASS,use***@example.com
+mask_email @없음 원본유지,PASS,
+build_masked_reservation: 이름 마스킹,PASS,
+build_masked_reservation: 생년월일 마스킹,PASS,
+build_masked_reservation: 휴대전화 마스킹,PASS,
+build_masked_reservation: 비PII 필드 포함,PASS,
+build_masked_reservation: 화이트리스트 밖 필드(manager) 제외됨,PASS,
+build_masked_reservation: 화이트리스트 밖 필드(estimatedCost) 제외됨,PASS,
+build_masked_reservation: 원본 raw phone 값이 결과에 그대로 노출되지 않음,PASS,
+환경변수 미설정 시 SheetsIntegrationNotConfigured 발생,PASS,
+list_reservations 정상 파싱,PASS,
+list_reservations 허용 필터만 전달(status),PASS,
+list_reservations action=list 전달,PASS,
+get_reservation 정상 파싱,PASS,
+get_reservation no 파라미터 전달,PASS,
+get_reservation 빈 예약번호 ValueError,PASS,
+GAS 오류 응답 시 SheetsIntegrationError,PASS,GAS 오류 응답(get): 예약 없음
+쓰기 action(create) 호출 차단,PASS,
+ping 정상 파싱,PASS,
