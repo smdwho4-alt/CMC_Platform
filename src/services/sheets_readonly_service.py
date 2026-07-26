@@ -78,14 +78,36 @@ def ping(*, session=None) -> dict[str, Any]:
     return _call_gas("ping", session=session)
 
 
+_SEARCH_FIELDS = ("reservationNo", "name", "phone", "program")
+_SORT_KEYS = ("createdAt", "wishDate", "status", "reservationNo")
+
+
 def list_reservations(
-    status: str = "", date_from: str = "", date_to: str = "", *, session=None
+    status: str = "", date_from: str = "", date_to: str = "",
+    search: str = "", sort_by: str = "", sort_dir: str = "desc",
+    *, session=None,
 ) -> list[dict[str, Any]]:
-    """예약 목록 조회(action=list). GAS가 지원하는 필터만 전달한다."""
+    """예약 목록 조회(action=list). GAS가 지원하는 필터(status/dateFrom/dateTo)는
+    그대로 전달하고, GAS가 지원하지 않는 검색/정렬(search/sort_by/sort_dir)은
+    GAS 응답을 받은 뒤 Python에서 후처리한다(Sprint 2 Commit 2, GAS 무수정 원칙).
+
+    search/sort_by/sort_dir을 모두 생략하면 Sprint 1과 동일한 동작(GAS가 반환한
+    순서 그대로)을 유지한다 — 기존 호출자(Dashboard 등)의 동작을 바꾸지 않는다.
+    """
     raw_params = {"status": status, "dateFrom": date_from, "dateTo": date_to}
     params = {k: v for k, v in raw_params.items() if v and k in _LIST_FILTER_KEYS}
     body = _call_gas("list", params, session=session)
-    return body.get("data", [])
+    data: list[dict[str, Any]] = body.get("data", [])
+
+    if search:
+        needle = search.strip().lower()
+        data = [r for r in data if any(needle in str(r.get(f, "")).lower() for f in _SEARCH_FIELDS)]
+
+    if sort_by in _SORT_KEYS:
+        reverse = sort_dir != "asc"
+        data = sorted(data, key=lambda r: str(r.get(sort_by, "")), reverse=reverse)
+
+    return data
 
 
 def get_reservation(reservation_no: str, *, session=None) -> dict[str, Any] | None:

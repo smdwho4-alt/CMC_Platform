@@ -119,10 +119,31 @@
         <label for="dateToInput">희망일(종료)</label><br>
         <input type="date" id="dateToInput">
       </div>
+      <div>
+        <label for="searchInput">검색(예약번호/성명/연락처/프로그램)</label><br>
+        <input type="search" id="searchInput" placeholder="예: 20260726, SMART">
+      </div>
+      <div>
+        <label for="sortSelect">정렬</label><br>
+        <select id="sortSelect">
+          <option value="createdAt:desc">접수일 최신순</option>
+          <option value="createdAt:asc">접수일 오래된순</option>
+          <option value="wishDate:desc">희망일 최신순</option>
+          <option value="wishDate:asc">희망일 오래된순</option>
+          <option value="reservationNo:asc">예약번호순</option>
+        </select>
+      </div>
       <button id="loadBtn" style="align-self:flex-end">조회</button>
     </div>
     <div id="resultArea">
       <div class="state-box">직원 ID를 입력하고 "조회"를 눌러주세요.</div>
+    </div>
+    <div class="toolbar" id="pagerBar" style="display:none;justify-content:space-between">
+      <span id="pagerInfo"></span>
+      <span>
+        <button id="prevPageBtn">이전</button>
+        <button id="nextPageBtn">다음</button>
+      </span>
     </div>
   </section>
 </main>
@@ -144,8 +165,17 @@
   var statusSelect = document.getElementById('statusSelect');
   var dateFromInput = document.getElementById('dateFromInput');
   var dateToInput = document.getElementById('dateToInput');
+  var searchInput = document.getElementById('searchInput');
+  var sortSelect = document.getElementById('sortSelect');
   var loadBtn = document.getElementById('loadBtn');
   var resultArea = document.getElementById('resultArea');
+  var pagerBar = document.getElementById('pagerBar');
+  var pagerInfo = document.getElementById('pagerInfo');
+  var prevPageBtn = document.getElementById('prevPageBtn');
+  var nextPageBtn = document.getElementById('nextPageBtn');
+
+  var PAGE_SIZE = 10;
+  var currentPage = 0; // 0-based, GET /reservations의 page 파라미터와 동일
 
   userIdInput.value = localStorage.getItem(USER_ID_KEY) || '';
 
@@ -275,17 +305,36 @@
     resultArea.innerHTML = '<table>' + head + body + '</table>';
   }
 
-  function load() {
+  function updatePager(body) {
+    // pageSize를 응답에 되돌려줄 때만(=서버가 페이지네이션을 적용했을 때만) 표시한다.
+    if (typeof body.totalCount !== 'number') {
+      pagerBar.style.display = 'none';
+      return;
+    }
+    pagerBar.style.display = 'flex';
+    var totalPages = Math.max(1, Math.ceil(body.totalCount / body.pageSize));
+    pagerInfo.textContent = (body.page + 1) + ' / ' + totalPages + ' 페이지 (총 ' + body.totalCount + '건)';
+    prevPageBtn.disabled = body.page <= 0;
+    nextPageBtn.disabled = body.page + 1 >= totalPages;
+  }
+
+  function load(resetPage) {
     var userId = currentUserId();
     if (!userId) {
       showState('직원 ID를 입력해 주세요.', true);
       return;
     }
+    if (resetPage) currentPage = 0;
 
+    var sortParts = (sortSelect.value || '').split(':');
     var params = new URLSearchParams();
     if (statusSelect.value) params.set('status', statusSelect.value);
     if (dateFromInput.value) params.set('dateFrom', dateFromInput.value);
     if (dateToInput.value) params.set('dateTo', dateToInput.value);
+    if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+    if (sortParts[0]) { params.set('sortBy', sortParts[0]); params.set('sortDir', sortParts[1] || 'desc'); }
+    params.set('page', String(currentPage));
+    params.set('pageSize', String(PAGE_SIZE));
 
     loadBtn.disabled = true;
     showState('조회 중…');
@@ -298,17 +347,26 @@
         if (!r.ok) throw new Error('조회 실패(HTTP ' + r.status + ')');
         return r.json();
       })
-      .then(function (body) { renderTable(body.data || []); })
-      .catch(function (err) { showState(err.message || '알 수 없는 오류가 발생했습니다.', true); })
+      .then(function (body) {
+        renderTable(body.data || []);
+        updatePager(body);
+      })
+      .catch(function (err) {
+        showState(err.message || '알 수 없는 오류가 발생했습니다.', true);
+        pagerBar.style.display = 'none';
+      })
       .finally(function () { loadBtn.disabled = false; });
   }
+
+  prevPageBtn.addEventListener('click', function () { currentPage = Math.max(0, currentPage - 1); load(false); });
+  nextPageBtn.addEventListener('click', function () { currentPage += 1; load(false); });
 
   applyUserBtn.addEventListener('click', function () {
     var userId = currentUserId();
     if (userId) localStorage.setItem(USER_ID_KEY, userId);
     loadDashboard();
   });
-  loadBtn.addEventListener('click', load);
+  loadBtn.addEventListener('click', function () { load(true); }); // 필터 변경 후 조회 → 1페이지로 초기화
   checkHealth();
   if (currentUserId()) loadDashboard();
 })();

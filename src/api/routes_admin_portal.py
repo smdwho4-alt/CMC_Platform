@@ -78,16 +78,35 @@ def create_admin_portal_router(data_dir: Path) -> APIRouter:
         status: str = Query(default=""),
         dateFrom: str = Query(default=""),
         dateTo: str = Query(default=""),
+        search: str = Query(default=""),
+        sortBy: str = Query(default=""),
+        sortDir: str = Query(default="desc"),
+        page: int = Query(default=0, ge=0),
+        pageSize: int = Query(default=0, ge=0),
         user: dict[str, Any] = Depends(require_user),
     ):
+        """예약 목록 조회. search/sortBy/sortDir/page/pageSize는 Sprint 2 Commit 2에서
+        추가된 Optional 파라미터로, 전달하지 않으면 Sprint 1과 완전히 동일하게 동작한다
+        (PM 결정사항 4: 기본 Response Schema 불변, 신규 파라미터는 Optional)."""
         try:
-            raw_list = sheets.list_reservations(status=status, date_from=dateFrom, date_to=dateTo)
+            raw_list = sheets.list_reservations(
+                status=status, date_from=dateFrom, date_to=dateTo,
+                search=search, sort_by=sortBy, sort_dir=sortDir,
+            )
         except sheets.SheetsIntegrationNotConfigured as e:
             raise HTTPException(503, str(e)) from e
         except sheets.SheetsIntegrationError as e:
             raise HTTPException(502, str(e)) from e
-        masked = [pii_mask.build_masked_reservation(r) for r in raw_list]
-        return {"ok": True, "count": len(masked), "data": masked}
+
+        page_list = raw_list
+        extra: dict[str, Any] = {}
+        if pageSize > 0:
+            start = page * pageSize
+            page_list = raw_list[start:start + pageSize]
+            extra = {"page": page, "pageSize": pageSize, "totalCount": len(raw_list)}
+
+        masked = [pii_mask.build_masked_reservation(r) for r in page_list]
+        return {"ok": True, "count": len(masked), "data": masked, **extra}
 
     @router.get("/reservations/{reservation_no}")
     def get_reservation(reservation_no: str, user: dict[str, Any] = Depends(require_user)):

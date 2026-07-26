@@ -1,0 +1,18 @@
+﻿테스트명,결과,상세
+search: 이름으로 검색,PASS,1
+search: 프로그램으로 검색(대소문자 무관),PASS,
+search: 매칭 없음 → 빈 리스트,PASS,
+sort: 예약번호 오름차순,PASS,
+sort: 접수일 내림차순,PASS,
+sort: 허용되지 않은 정렬키는 무시(원본 순서 유지),PASS,
+파라미터 미지정 시 원본 순서 그대로(Sprint 1과 동일 동작),PASS,
+파라미터 없이 호출 → 200,PASS,
+기본 응답에 page/pageSize/totalCount 없음(Sprint 1과 동일 스키마 유지),PASS,"['ok', 'count', 'data']"
+기본 응답 count = 전체 건수(페이지네이션 미적용 시),PASS,
+pageSize 지정 시 count가 페이지 크기로 제한,PASS,2
+pageSize 지정 시 totalCount는 전체 건수,PASS,
+pageSize 지정 시 page/pageSize 필드 포함(Optional 추가),PASS,
+2페이지 조회 시 잔여 1건,PASS,
+search 파라미터 라우터 전달 확인,PASS,"{'ok': True, 'count': 1, 'data': [{'reservationNo': '20260703-0001', 'createdAt': '2026-07-03 10:00:00', 'program': 'VIP', 'wishDate': '2026-08-10', 'wishTime': '11:00', 'status': 'PENDING_APPROVAL', 'note': '', 'name': '박○○', 'birth': '1990-**-**', 'phone': '010-****-3333'}]}"
+sortBy/sortDir 파라미터 라우터 전달 확인,PASS,
+검색/정렬 결과에도 PII 마스킹 유지,PASS,
