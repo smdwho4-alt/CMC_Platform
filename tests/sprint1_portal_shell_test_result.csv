@@ -1,0 +1,29 @@
+﻿테스트명,결과,상세
+admin_portal_new.html 존재,PASS,C:\Users\cmcsh\건강검진\99_임시보관_정리대기\CMC_Platform_new\app\pages\admin_portal_new.html
+API_BASE가 절대 URL(http://localhost:8600) 기반,PASS,
+API_BASE가 ?api= 재정의 지원(admin_api.js와 동일 패턴),PASS,
+admin-portal API 엔드포인트 참조,PASS,
+쓰기 관련 코드 미포함: 'action=create',PASS,
+쓰기 관련 코드 미포함: 'action=update',PASS,
+쓰기 관련 코드 미포함: 'action=updateStatus',PASS,
+쓰기 관련 코드 미포함: 'action=updateOps',PASS,
+"쓰기 관련 코드 미포함: ""method: 'POST'""",PASS,
+"쓰기 관련 코드 미포함: ""method:'POST'""",PASS,
+401 처리 코드 존재,PASS,
+503(Sheets 미설정) 처리 코드 존재,PASS,
+502(연동오류) 처리 코드 존재,PASS,
+빈 데이터 처리(renderTable 내 length 체크) 존재,PASS,
+네트워크 오류 catch 처리 존재,PASS,
+조회 결과 컬럼에 '성명' 포함,PASS,
+조회 결과 컬럼에 '생년월일' 포함,PASS,
+조회 결과 컬럼에 '휴대전화' 포함,PASS,
+기존 화면(admin_reservations_v2_new.html) 유지 안내 포함,PASS,
+기존 화면(admin/index.html) 유지 안내 포함,PASS,
+기존 화면(admin_dashboard_v3_new.html) 유지 안내 포함,PASS,
+HTML 이스케이프 함수(esc) 정의됨,PASS,
+테이블 렌더링에서 esc() 사용,PASS,
+[수동 QA] 최초 로드 시 콘솔 오류 없음,PASS,read_console_messages 확인 완료
+[수동 QA] health 배지 'Sheets 연동 미설정' 정상 표시,PASS,
+[수동 QA] CORS Preflight(OPTIONS) 200 확인,PASS,포트 4000→8600 교차 요청 정상
+[수동 QA] 503 오류 시 안내 메시지 정상 표시,PASS,Sheets 연동이 설정되지 않았습니다...
+[수동 QA] API_BASE 상대경로 버그 발견 및 수정,PASS,"최초 구현은 상대경로였음 — 브라우저 QA로 발견, 수정 후 재검증 완료"

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Single Admin Portal(기반, Sprint 1) | CMC Health Screening Platform</title>
+<style>
+  :root { --primary:#1a4f8a; --gray-100:#f5f7fa; --gray-300:#dde3ea; --gray-500:#8a94a3;
+          --danger:#c0392b; --ok:#1e8e5a; --warn:#b8860b; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Malgun Gothic', sans-serif; margin: 0; background: var(--gray-100); color: #222; }
+  header { background: var(--primary); color: #fff; padding: 14px 20px; display: flex;
+           align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  header h1 { font-size: 17px; margin: 0; }
+  .badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+  .badge-ok { background: var(--ok); color: #fff; }
+  .badge-warn { background: var(--warn); color: #fff; }
+  .badge-err { background: var(--danger); color: #fff; }
+  .badge-unknown { background: var(--gray-500); color: #fff; }
+  main { padding: 16px 20px; }
+  .notice { background: #fff8e1; border: 1px solid #f0d878; border-radius: 6px; padding: 10px 14px;
+            font-size: 13px; color: #6b5900; margin-bottom: 14px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+             background: #fff; padding: 10px; border-radius: 8px; border: 1px solid var(--gray-300); }
+  .toolbar label { font-size: 12px; color: var(--gray-500); }
+  .toolbar input, .toolbar select { padding: 6px 8px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 13px; }
+  .toolbar button { padding: 7px 14px; border: none; border-radius: 4px; background: var(--primary);
+                     color: #fff; cursor: pointer; font-size: 13px; }
+  .toolbar button:disabled { background: var(--gray-500); cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden;
+          border: 1px solid var(--gray-300); }
+  th, td { padding: 8px 10px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--gray-300); }
+  th { background: var(--gray-100); color: var(--gray-500); font-weight: 700; }
+  .state-box { background: #fff; border: 1px solid var(--gray-300); border-radius: 8px; padding: 30px;
+               text-align: center; color: var(--gray-500); font-size: 14px; }
+  .state-box.error { color: var(--danger); border-color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏥 Single Admin Portal <span style="font-weight:400;opacity:.85">— 조회 전용 기반(Sprint 1)</span></h1>
+  <span id="connBadge" class="badge badge-unknown">연결 확인 중…</span>
+</header>
+
+<main>
+  <div class="notice">
+    이 화면은 <b>Single Admin Portal의 조회 전용 기반(foundation)</b>입니다. 승인·상태변경 등 쓰기 기능은
+    이번 Sprint 범위가 아니며, 기존 관리자 화면(<code>admin_reservations_v2_new.html</code>,
+    <code>admin/index.html</code>, <code>admin_dashboard_v3_new.html</code>)은 변경 없이 그대로 사용됩니다.
+    이 화면에 표시되는 개인정보는 서버에서 마스킹되어 전달됩니다.
+  </div>
+
+  <div class="toolbar">
+    <div>
+      <label for="userIdInput">직원 ID(X-User-Id)</label><br>
+      <input type="text" id="userIdInput" placeholder="예: USR-0002">
+    </div>
+    <div>
+      <label for="statusSelect">상태</label><br>
+      <select id="statusSelect">
+        <option value="">전체</option>
+        <option value="PENDING_APPROVAL">승인대기</option>
+        <option value="CONFIRMED">확정</option>
+        <option value="REJECTED">거절</option>
+        <option value="CANCELLED">취소</option>
+        <option value="COMPLETED">완료</option>
+      </select>
+    </div>
+    <div>
+      <label for="dateFromInput">희망일(시작)</label><br>
+      <input type="date" id="dateFromInput">
+    </div>
+    <div>
+      <label for="dateToInput">희망일(종료)</label><br>
+      <input type="date" id="dateToInput">
+    </div>
+    <button id="loadBtn" style="align-self:flex-end">조회</button>
+  </div>
+
+  <div id="resultArea">
+    <div class="state-box">직원 ID를 입력하고 "조회"를 눌러주세요.</div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  // 기존 admin/admin_api.js와 동일한 패턴: 정적 서버(예: 4000)와 API 서버(8600)가
+  // 다른 포트로 분리 운영되므로 절대 URL을 사용한다. ?api= 쿼리로 재정의 가능.
+  var _params = new URLSearchParams(location.search);
+  var API_BASE = (_params.get('api') || 'http://localhost:8600') + '/api/admin-portal';
+  var USER_ID_KEY = 'cshsp_admin_portal_user_id';
+
+  var connBadge = document.getElementById('connBadge');
+  var userIdInput = document.getElementById('userIdInput');
+  var statusSelect = document.getElementById('statusSelect');
+  var dateFromInput = document.getElementById('dateFromInput');
+  var dateToInput = document.getElementById('dateToInput');
+  var loadBtn = document.getElementById('loadBtn');
+  var resultArea = document.getElementById('resultArea');
+
+  userIdInput.value = localStorage.getItem(USER_ID_KEY) || '';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function setConnBadge(state, text) {
+    connBadge.className = 'badge badge-' + state;
+    connBadge.textContent = text;
+  }
+
+  function showState(message, isError) {
+    resultArea.innerHTML = '<div class="state-box' + (isError ? ' error' : '') + '">' + esc(message) + '</div>';
+  }
+
+  function checkHealth() {
+    fetch(API_BASE + '/health')
+      .then(function (r) { return r.json(); })
+      .then(function (body) {
+        if (body.sheetsIntegration === 'connected') {
+          setConnBadge('ok', '🟢 Sheets 연동 정상');
+        } else if (body.sheetsIntegration === 'not_configured') {
+          setConnBadge('warn', '⚪ Sheets 연동 미설정');
+        } else {
+          setConnBadge('err', '🔴 Sheets 연동 오류');
+        }
+      })
+      .catch(function () {
+        setConnBadge('err', '🔴 서버 응답 없음(네트워크 오류)');
+      });
+  }
+
+  function renderTable(rows) {
+    if (!rows.length) {
+      showState('조회된 예약이 없습니다.');
+      return;
+    }
+    var head = '<tr><th>예약번호</th><th>성명</th><th>생년월일</th><th>휴대전화</th>'
+             + '<th>프로그램</th><th>희망일</th><th>희망시간</th><th>상태</th></tr>';
+    var body = rows.map(function (r) {
+      return '<tr>'
+        + '<td>' + esc(r.reservationNo) + '</td>'
+        + '<td>' + esc(r.name) + '</td>'
+        + '<td>' + esc(r.birth) + '</td>'
+        + '<td>' + esc(r.phone) + '</td>'
+        + '<td>' + esc(r.program) + '</td>'
+        + '<td>' + esc(r.wishDate) + '</td>'
+        + '<td>' + esc(r.wishTime) + '</td>'
+        + '<td>' + esc(r.status) + '</td>'
+        + '</tr>';
+    }).join('');
+    resultArea.innerHTML = '<table>' + head + body + '</table>';
+  }
+
+  function load() {
+    var userId = userIdInput.value.trim();
+    if (!userId) {
+      showState('직원 ID를 입력해 주세요.', true);
+      return;
+    }
+    localStorage.setItem(USER_ID_KEY, userId);
+
+    var params = new URLSearchParams();
+    if (statusSelect.value) params.set('status', statusSelect.value);
+    if (dateFromInput.value) params.set('dateFrom', dateFromInput.value);
+    if (dateToInput.value) params.set('dateTo', dateToInput.value);
+
+    loadBtn.disabled = true;
+    showState('조회 중…');
+
+    fetch(API_BASE + '/reservations?' + params.toString(), { headers: { 'X-User-Id': userId } })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 503) throw new Error('Sheets 연동이 설정되지 않았습니다. 관리자에게 문의하세요.');
+        if (r.status === 502) throw new Error('Sheets 연동 서버 오류입니다. 잠시 후 다시 시도해 주세요.');
+        if (!r.ok) throw new Error('조회 실패(HTTP ' + r.status + ')');
+        return r.json();
+      })
+      .then(function (body) { renderTable(body.data || []); })
+      .catch(function (err) { showState(err.message || '알 수 없는 오류가 발생했습니다.', true); })
+      .finally(function () { loadBtn.disabled = false; });
+  }
+
+  loadBtn.addEventListener('click', load);
+  checkHealth();
+})();
+</script>
+</body>
+</html>
