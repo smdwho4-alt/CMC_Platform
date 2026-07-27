@@ -65,6 +65,7 @@ LEGACY_STATUS_MAP = {
     "검진완료": "COMPLETED",
     "일정변경": "CHANGED",
     "예약취소": "CANCELLED",
+    "거절": "REJECTED",  # Sprint 4 Commit 2(Reservation Approval Foundation) 신규 추가
 }
 
 

@@ -279,6 +279,26 @@
   </section>
 </main>
 
+<!-- 예약 거절(Sprint 4 Commit 2, Reservation Approval Foundation) — 거절 사유 입력 모달.
+     승인은 별도 사유가 필요 없어 모달 없이 즉시 처리한다(PM UI 원칙). -->
+<div class="modal-overlay" id="rejectModal">
+  <div class="modal-box" style="max-width:380px">
+    <header style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;">
+      <strong>예약 거절</strong>
+      <button class="modal-close" id="rejectCloseBtn" aria-label="닫기">✕</button>
+    </header>
+    <div class="modal-body">
+      <div class="notice" style="margin-bottom:10px">개인정보(전화번호·주민등록번호 등)를 입력하지 마세요.</div>
+      <label for="rejectReasonInput" style="font-size:13px;color:var(--gray-500)">거절 사유(필수, 2~200자)</label><br>
+      <textarea id="rejectReasonInput" style="width:100%;min-height:70px;margin-top:6px;font:inherit;border:1px solid var(--gray-300);border-radius:6px;padding:6px 8px;resize:vertical;box-sizing:border-box"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button id="rejectCancelBtn">취소</button>
+        <button id="rejectConfirmBtn" style="background:var(--danger);color:#fff;border:none;padding:7px 14px;border-radius:4px;cursor:pointer">거절 확정</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 예약상세(P3) — 조회 전용 모달. Sprint 1 기존 엔드포인트(/api/admin-portal/reservations/{no})를
      100% 재사용하며 신규 백엔드는 없다(PM 결정사항 3). 쓰기 UI 없음. -->
 <div class="modal-overlay" id="detailModal">
@@ -754,8 +774,16 @@
       return;
     }
     var head = '<tr><th>예약번호</th><th>성명</th><th>생년월일</th><th>휴대전화</th>'
-             + '<th>프로그램</th><th>희망일</th><th>희망시간</th><th>상태</th></tr>';
+             + '<th>프로그램</th><th>희망일</th><th>희망시간</th><th>상태</th><th>작업</th></tr>';
     var body = rows.map(function (r) {
+      // Sprint 4 Commit 2: '예약접수' 상태에서만 승인/거절 버튼 노출(PM UI 원칙 —
+      // 다른 상태에는 처리 버튼을 표시하지 않는다). 서버가 최종 권한을 재검증하므로
+      // (403) 클라이언트는 역할을 미리 판별하지 않고 상태만으로 버튼을 노출한다
+      // (Sprint 3 상담관리 버튼과 동일 패턴).
+      var actionCell = r.status === '예약접수'
+        ? '<button class="rsv-approve-btn" data-no="' + esc(r.reservationNo) + '">승인</button> '
+          + '<button class="rsv-reject-btn" data-no="' + esc(r.reservationNo) + '">거절</button>'
+        : '';
       return '<tr class="clickable" data-no="' + esc(r.reservationNo) + '">'
         + '<td>' + esc(r.reservationNo) + '</td>'
         + '<td>' + esc(r.name) + '</td>'
@@ -765,6 +793,7 @@
         + '<td>' + esc(r.wishDate) + '</td>'
         + '<td>' + esc(r.wishTime) + '</td>'
         + '<td>' + esc(r.status) + '</td>'
+        + '<td>' + actionCell + '</td>'
         + '</tr>';
     }).join('');
     resultArea.innerHTML = '<table>' + head + body + '</table>';
@@ -782,6 +811,110 @@
     prevPageBtn.disabled = body.page <= 0;
     nextPageBtn.disabled = body.page + 1 >= totalPages;
   }
+
+  // ── 예약 승인/거절(Sprint 4 Commit 2, Reservation Approval Foundation) ──
+  var rejectModal = document.getElementById('rejectModal');
+  var rejectReasonInput = document.getElementById('rejectReasonInput');
+  var rejectCloseBtn = document.getElementById('rejectCloseBtn');
+  var rejectCancelBtn = document.getElementById('rejectCancelBtn');
+  var rejectConfirmBtn = document.getElementById('rejectConfirmBtn');
+  var _rejectTargetNo = null;
+
+  function closeRejectModal() { rejectModal.classList.remove('open'); _rejectTargetNo = null; }
+  function openRejectModal(reservationNo) {
+    _rejectTargetNo = reservationNo;
+    rejectReasonInput.value = '';
+    rejectModal.classList.add('open');
+  }
+  rejectCloseBtn.addEventListener('click', closeRejectModal);
+  rejectCancelBtn.addEventListener('click', closeRejectModal);
+  rejectModal.addEventListener('click', function (e) { if (e.target === rejectModal) closeRejectModal(); });
+
+  // 409(다른 사용자가 이미 처리했거나 현재 상태에서 처리 불가) 공용 처리 — PM 지정 문구.
+  function handleApprovalConflict() {
+    showToast('다른 사용자가 이미 처리했거나 현재 상태에서 처리할 수 없습니다.', 'error');
+    load(false);
+  }
+
+  function approveReservation(reservationNo, btn) {
+    var userId = currentUserId();
+    if (!userId) return;
+    btn.disabled = true;
+    fetch(ADMIN_BASE + '/reservations/' + encodeURIComponent(reservationNo) + '/approve', {
+      method: 'POST',
+      headers: { 'X-User-Id': userId },
+    })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
+        if (r.status === 409) { handleApprovalConflict(); return null; }
+        return r.json().then(function (b) {
+          if (!r.ok) throw new Error(b.detail || ('승인 실패(HTTP ' + r.status + ')'));
+          return b;
+        });
+      })
+      .then(function (b) {
+        if (!b) return;
+        showToast('예약 ' + reservationNo + '이(가) 승인되었습니다.', 'success');
+        load(false);
+      })
+      .catch(function (err) {
+        showToast(err.message || '알 수 없는 오류가 발생했습니다.', 'error');
+      })
+      .finally(function () { btn.disabled = false; });
+  }
+
+  function rejectReservation(reservationNo, reason, btn) {
+    var userId = currentUserId();
+    if (!userId) return;
+    btn.disabled = true;
+    fetch(ADMIN_BASE + '/reservations/' + encodeURIComponent(reservationNo) + '/reject', {
+      method: 'POST',
+      headers: { 'X-User-Id': userId, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason }),
+    })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
+        if (r.status === 409) { handleApprovalConflict(); return null; }
+        if (r.status === 422) {
+          return r.json().then(function (b) {
+            var detail = b.detail;
+            var msg = Array.isArray(detail) && detail[0] && detail[0].msg
+              ? detail[0].msg : '거절 사유를 확인해 주세요.';
+            throw new Error(msg);
+          });
+        }
+        return r.json().then(function (b) {
+          if (!r.ok) throw new Error(b.detail || ('거절 실패(HTTP ' + r.status + ')'));
+          return b;
+        });
+      })
+      .then(function (b) {
+        if (!b) return;
+        showToast('예약 ' + reservationNo + '이(가) 거절되었습니다.', 'success');
+        load(false);
+      })
+      .catch(function (err) {
+        showToast(err.message || '알 수 없는 오류가 발생했습니다.', 'error');
+      })
+      .finally(function () { btn.disabled = false; });
+  }
+
+  rejectConfirmBtn.addEventListener('click', function () {
+    var reason = rejectReasonInput.value;
+    if (!reason || !reason.trim()) { showToast('거절 사유를 입력해 주세요.', 'error'); return; }
+    var no = _rejectTargetNo;
+    closeRejectModal();
+    rejectReservation(no, reason, rejectConfirmBtn);
+  });
+
+  resultArea.addEventListener('click', function (e) {
+    var approveBtn = e.target.closest ? e.target.closest('.rsv-approve-btn') : null;
+    var rejectBtn = e.target.closest ? e.target.closest('.rsv-reject-btn') : null;
+    if (approveBtn) { e.stopPropagation(); approveReservation(approveBtn.dataset.no, approveBtn); }
+    if (rejectBtn) { e.stopPropagation(); openRejectModal(rejectBtn.dataset.no); }
+  });
 
   function load(resetPage) {
     var userId = currentUserId();

@@ -23,6 +23,7 @@ Sprint 3 Commit 1(RBAC): 인증 위에 권한(Role Check)을 추가했다. 모�
 from __future__ import annotations
 
 import datetime as _dt
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,14 +32,17 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parents[1]
 for _p in ("core", "services", "reservation"):
     sys.path.insert(0, str(_ROOT / "src" / _p))
-sys.path.insert(0, str(_HERE))  # file_lock.py (같은 src/api/ 디렉터리)
+sys.path.insert(0, str(_HERE))  # file_lock.py, reservation_approval_states.py (같은 src/api/ 디렉터리)
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from pydantic import BaseModel, field_validator  # noqa: E402
 
 import core_data_loader as loader  # noqa: E402
 import pii_mask  # noqa: E402
+import reservation_approval_states as approval_states  # noqa: E402
+import reservation_audit as audit  # noqa: E402
 import sheets_readonly_service as sheets  # noqa: E402
+import sheets_write_service as sheets_write  # noqa: E402
 from file_lock import DataLock  # noqa: E402
 from json_store import now_iso, read_doc, write_doc  # noqa: E402
 
@@ -108,6 +112,33 @@ _CRM_STATUS_ORDER = ["OPEN", "IN_PROGRESS", "CLOSED"]  # 순차 전이만 허용
 class ConsultationStatusBody(BaseModel):
     status: str
     handledBy: str | None = None
+
+
+# ── Sprint 4 Commit 2: 예약 승인/거절(Reservation Approval Foundation) ──
+# PM 결정 2(Sprint4_Commit2_Implementation_Plan_v1.0.md §12-2): 거절 사유는 필수이며
+# 검증 실패 시 422를 반환한다(Pydantic validator가 FastAPI 표준 422로 자동 변환).
+_REJECT_REASON_MIN_LEN = 2
+_REJECT_REASON_MAX_LEN = 200
+_LONG_DIGIT_RUN = re.compile(r"\d{6,}")  # 전화번호·주민등록번호로 의심되는 연속 숫자 방어(완전 탐지 아님)
+_DIGIT_SEPARATOR = re.compile(r"(?<=\d)[\s\-](?=\d)")  # '010-1234-5678'처럼 숫자 사이 구분자만 제거(완전 탐지 목적 아님, 날짜 등 오탐 가능성 있음 — 알려진 제약)
+
+
+class RejectReservationBody(BaseModel):
+    reason: str
+
+    @field_validator("reason")
+    @classmethod
+    def _validate_reason(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("거절 사유를 입력해 주세요.")
+        if len(v) < _REJECT_REASON_MIN_LEN:
+            raise ValueError(f"거절 사유가 너무 짧습니다(최소 {_REJECT_REASON_MIN_LEN}자).")
+        if len(v) > _REJECT_REASON_MAX_LEN:
+            raise ValueError(f"거절 사유가 너무 깁니다(최대 {_REJECT_REASON_MAX_LEN}자).")
+        if _LONG_DIGIT_RUN.search(_DIGIT_SEPARATOR.sub("", v)):
+            raise ValueError("거절 사유에 전화번호·주민등록번호로 의심되는 긴 숫자를 입력할 수 없습니다. 개인정보를 입력하지 마세요.")
+        return v
 
 
 def _crm_masking_tier(user: dict[str, Any]) -> str:
@@ -233,6 +264,10 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     # 상태변경(쓰기)은 아래에서 crm:manage만 별도로 요구한다(더 엄격).
     require_consultation_view = _build_require_permission(data_dir, "crm:manage", "crm:log", "audit:view")
     require_consultation_manage = _build_require_permission(data_dir, "crm:manage")
+    # Sprint 4 Commit 2: 기존 reservation:approve 권한 문자열을 그대로 재사용한다
+    # (reservation_engine.py::approve_reservation()/reject_reservation()과 동일 권한,
+    # 새 권한 모델을 만들지 않는다 — PM 권한 원칙).
+    require_reservation_approve = _build_require_permission(data_dir, "reservation:approve")
 
     @router.get("/dashboard")
     def dashboard(user: dict[str, Any] = Depends(require_dashboard_view)):
@@ -417,5 +452,85 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
                 "updatedAt": rec.get("updatedAt"),
             },
         }
+
+    # ── Sprint 4 Commit 2: 예약 승인/거절(Reservation Approval Foundation) ──
+    # 대상은 Google Sheets 예약(SSOT, ADR-013)이며 로컬 JSON 예약(api_server.py의
+    # /api/reservations/{rid}/approve 등)은 건드리지 않는다 — URL 네임스페이스가
+    # 다르므로(/api/admin/reservations/* vs /api/reservations/*) 충돌 없음.
+    # Slot/정원 검사는 Commit 3 범위이며 이 엔드포인트에 포함하지 않는다.
+    def _process_reservation_approval(
+        reservation_no: str, target_status: str, user: dict[str, Any], reason: str | None,
+    ) -> dict[str, Any]:
+        # 1) read — Sheets의 현재 상태를 승인/거절 직전에 다시 조회한다(가능한 범위의
+        #    동시성 보호. GAS updateStatus는 compare-and-swap을 지원하지 않으므로 이
+        #    read→validate→write로 경쟁 조건을 줄이되 완전히 없애지는 못한다 —
+        #    Sprint4_Commit2_Implementation_Plan_v1.0.md §12-5 참조).
+        try:
+            current = sheets.get_reservation(reservation_no)
+        except sheets.SheetsIntegrationNotConfigured as e:
+            raise HTTPException(503, str(e)) from e
+        except sheets.SheetsIntegrationError as e:
+            raise HTTPException(502, str(e)) from e
+        if current is None:
+            raise HTTPException(404, f"예약번호 없음: {reservation_no}")
+
+        current_status = current.get("status")
+
+        # 2) validate — 예약접수 상태에서만 승인/거절 가능(PM 결정 1).
+        try:
+            approval_states.assert_can_transition(current_status, target_status)
+        except approval_states.InvalidApprovalTransitionError as e:
+            raise HTTPException(
+                409,
+                f"현재 상태({current_status})에서 처리할 수 없습니다 — 다른 사용자가 "
+                "이미 처리했거나 승인/거절 대상 상태가 아닙니다.",
+            ) from e
+
+        # 3) write — GAS 기존 updateStatus action만 사용(신규 action 없음, GAS 무수정).
+        try:
+            sheets_write.update_status(reservation_no, target_status)
+        except sheets_write.SheetsIntegrationNotConfigured as e:
+            raise HTTPException(503, str(e)) from e
+        except sheets_write.SheetsIntegrationError as e:
+            raise HTTPException(502, str(e)) from e
+
+        # Audit은 Sheets 상태 변경 성공 이후에만 기록한다(PM Audit 원칙). 기존
+        # reservation_engine.py::approve_reservation()과 동일하게 "쓰기 성공 →
+        # 감사기록" 순서이며, 감사기록 자체가 실패하는 경우의 보상 트랜잭션은
+        # 기존 시스템에도 없으므로 이번 Commit도 동일 정책을 따른다(§12-6).
+        event = "RESERVATION_APPROVED" if target_status == "예약확정" else "RESERVATION_REJECTED"
+        audit.append_audit(
+            data_dir, event, "Reservation", reservation_no, user.get("id"),
+            before={"status": current_status}, after={"status": target_status},
+            channel="ADMIN_PORTAL", note=reason,
+        )
+
+        return {
+            "ok": True,
+            "data": {
+                "reservationNo": reservation_no,
+                "previousStatus": current_status,
+                "status": target_status,
+                "processedBy": user.get("id"),
+                "processedAt": now_iso(),
+            },
+        }
+
+    @router.post("/reservations/{reservation_no}/approve")
+    def approve_reservation(
+        reservation_no: str, user: dict[str, Any] = Depends(require_reservation_approve),
+    ):
+        """예약 승인(권한: reservation:approve) — 예약접수 → 예약확정만 허용."""
+        return _process_reservation_approval(reservation_no, "예약확정", user, reason=None)
+
+    @router.post("/reservations/{reservation_no}/reject")
+    def reject_reservation(
+        reservation_no: str, body: RejectReservationBody,
+        user: dict[str, Any] = Depends(require_reservation_approve),
+    ):
+        """예약 거절(권한: reservation:approve, 기존 reject_reservation()과 동일 권한 재사용)
+        — 예약접수 → 거절만 허용. 거절 사유는 필수이며 Sheets에는 저장하지 않고
+        Audit 로그에만 기록한다(PM 결정 2)."""
+        return _process_reservation_approval(reservation_no, "거절", user, reason=body.reason)
 
     return router
