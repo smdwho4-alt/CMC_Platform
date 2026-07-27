@@ -1,0 +1,60 @@
+﻿테스트명,결과,상세
+Repository에 'OPEN' 상태 문자열이 Slot 상태로 쓰이지 않음(코드 조사로 확인),PASS,
+Repository의 정상 Slot 상태는 'AVAILABLE'(slot_generator.py 기본값으로 확인),PASS,
+FULL/BLOCKED/HOLD/WAITING이 reservation_engine.py에 실제 상태로 존재(재확인),PASS,
+_SLOT_ALLOWED_STATUSES에 AVAILABLE만 포함(OPEN 없음),PASS,
+FULL/BLOCKED/HOLD/CLOSED 코드 매핑 존재,PASS,
+SLOT_INVALID_STATE/SLOT_RESERVATION_CONFLICT 코드 존재,PASS,
+신규 승인 API 엔드포인트 추가 없음(기존 approve/reject 2개만 유지),PASS,
+"기존 API 오류 응답 구조({code, message}) 그대로 재사용, 신규 포맷 없음",PASS,
+(1)/(2) AVAILABLE Slot 승인 성공(200) — Repository에 'OPEN' 상태 없어 AVAILABLE로 대체 검증,PASS,200
+(3) 상태값 FULL Slot 승인 시도 → 409 SLOT_FULL,PASS,"{'detail': {'code': 'SLOT_FULL', 'message': '해당 시간대의 예약 정원이 마감되었습니다.'}}"
+(4) BLOCKED Slot 승인 시도 → 409 SLOT_BLOCKED,PASS,"{'detail': {'code': 'SLOT_BLOCKED', 'message': '해당 시간대는 운영상 예약이 차단되어 있습니다.'}}"
+(5) HOLD Slot 승인 시도 → 409 SLOT_ON_HOLD,PASS,"{'detail': {'code': 'SLOT_ON_HOLD', 'message': '해당 시간대는 현재 예약이 보류되어 있습니다.'}}"
+(6) CLOSED Slot 승인 시도 → 409 SLOT_NOT_AVAILABLE,PASS,"{'detail': {'code': 'SLOT_NOT_AVAILABLE', 'message': '해당 시간대에는 예약 가능한 슬롯이 없습니다.'}}"
+(7) 알 수 없는 상태값 Slot 승인 시도 → 409 SLOT_INVALID_STATE,PASS,"{'detail': {'code': 'SLOT_INVALID_STATE', 'message': '예약 슬롯 상태를 확인할 수 없습니다. 관리자에게 문의해 주세요.'}}"
+(8) 빈 문자열 상태 Slot 승인 시도 → 409 SLOT_INVALID_STATE(안전 차단),PASS,
+(9) null 상태 Slot 승인 시도 → 409 SLOT_INVALID_STATE(안전 차단),PASS,
+(10) 정원 2인 Slot에 3번째 승인 시도 → 409 SLOT_FULL(Capacity 초과 방지),PASS,
+(10) reservedCount가 capacity를 초과하지 않음,PASS,
+"(11) 동일 예약번호 재승인 시도(같은 Slot, 정원 여유 있음) → 409 SLOT_RESERVATION_CONFLICT",PASS,"{'detail': {'code': 'SLOT_RESERVATION_CONFLICT', 'message': '예약과 슬롯 정보가 일치하지 않아 처리할 수 없습니다. 관리자 확인이 필요합니다.'}}"
+(11) 재시도로 reservedCount가 중복 증가하지 않음,PASS,
+(12) 동일 예약번호를 다른 Slot에 승인 시도 → 409 SLOT_RESERVATION_CONFLICT,PASS,
+(12) 다른 Slot은 점유되지 않음(reservedCount 0 유지),PASS,
+(13) Sheets 쓰기 실패 → 502 SHEETS_WRITE_FAILED,PASS,
+(15) Rollback 후 reservedCount가 실패 전(1)으로 원상복구,PASS,1
+(16) Rollback 후 실패한 예약번호(20260805-0031)가 배열에서 제거됨,PASS,
+(17) Rollback 후에도 다른 예약(20260805-0030)의 점유 기록은 그대로 유지,PASS,
+(17) 다른 예약(20260805-0030)의 Sheets 상태도 그대로 유지(예약확정),PASS,
+(14) Rollback Audit에 [ROLLBACK/COMPENSATION] 태그로 일반 취소와 구분됨,PASS,
+(14) Rollback Audit에 trigger=SHEETS_WRITE_FAILED 명시,PASS,
+Rollback 자체 실패 시 500 SLOT_ROLLBACK_FAILED로 격상(일반 Audit 실패보다 심각하게 처리),PASS,"{'detail': {'code': 'SLOT_ROLLBACK_FAILED', 'message': 'Sheets 쓰기 실패(강제 실패(테스트)) 이후 Slot 롤백도 실패했습니다(디스크 오류(시뮬레이션, rollback 단계)). Slot 데이터(slotId=SLOT-H-LASTONE)를 관리자가 직접 확인해야 합니다.'}}"
+(18) 동일 예약번호 동시 승인 요청 2건 중 정확히 1건만 200,PASS,"[200, 409]"
+(18) reservedCount가 정확히 1만큼만 증가(중복 점유 없음),PASS,
+(19) 정원 1인 Slot에 서로 다른 예약 2건 동시 승인 시 정확히 1건만 200,PASS,"[200, 409]"
+(7)/(19) reserved 값이 capacity를 초과하지 않음,PASS,
+(19) reserved 값이 음수가 되지 않음,PASS,
+(19) 예약번호 배열에 중복이 생기지 않음,PASS,
+(20) DIRECTOR(reservation:approve 미보유) → 403 회귀 없음,PASS,
+(20) 헤더 없음 → 401 회귀 없음,PASS,
+(21) 이미 예약확정인 건 재승인 → 기존 409(전이 불가) 회귀 없음,PASS,{'detail': '현재 상태(예약확정)에서 처리할 수 없습니다 — 다른 사용자가 이미 처리했거나 승인/거절 대상 상태가 아닙니다.'}
+(22) 거절 API 회귀 없음(200),PASS,200
+(23)~(28) 6개 Slot 코드 전부 프론트 분기 목록에 포함,PASS,
+_SLOT_CONFLICT_CODES 배열로 코드 목록을 한 곳에서만 관리(중복 정의 없음),PASS,
+(29) 오류 후 목록 재조회(load) 정책 유지,PASS,
+(30) browser alert() 미사용(신규 코드에도 토스트만 사용),PASS,
+신규 Portal 탭 추가 없음(기존 6개 탭 그대로),PASS,
+기존 일반 409(handleApprovalConflict) 문구 제거되지 않음(회귀 없음),PASS,
+engine._update_slot/_release_slot 재사용 유지(신규 Slot Engine 없음),PASS,
+"Equipment.capacityPerHour 실사용 없음(Commit4 이후 범위, 회귀 없음)",PASS,
+검진유형별 정원 로직 없음(회귀 없음),PASS,
+대기예약(WAITING) 신규 로직 없음 — 허용 목록에 없어 catch-all로 차단만 함,PASS,
+GAS(sheets_api_v3_final.gs) 무수정 확인,PASS,
+Legacy 화면(admin_reservations_v2_new.html) 무수정 확인(이번 Commit 3A 대상 아님),PASS,
+api_server.py(로컬 JSON 라우트) 무수정 확인,PASS,
+[수동 QA] SLOT_BLOCKED 승인 클릭 → '해당 시간대는 운영상 예약이 차단되어 있습니다.' 토스트 실제 표시,PASS,
+[수동 QA] SLOT_ON_HOLD 승인 클릭 → '해당 시간대는 현재 예약이 보류되어 있습니다.' 토스트 실제 표시,PASS,
+[수동 QA] SLOT_INVALID_STATE 승인 클릭 → '예약 슬롯 상태를 확인할 수 없습니다...' 토스트 실제 표시,PASS,
+[수동 QA] SLOT_RESERVATION_CONFLICT(중복 재시도) 클릭 → '예약과 슬롯 정보가 일치하지 않아...' 토스트 실제 표시,PASS,
+[수동 QA] 브라우저 캐시로 인한 오판 방지(cachebust 쿼리로 강제 새로고침 후 확인),PASS,
+[수동 QA] 전 구간 콘솔 오류 0건,PASS,

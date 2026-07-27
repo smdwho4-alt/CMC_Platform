@@ -32,7 +32,10 @@
 | Single Admin Portal Sprint 3 | Operator First — RBAC/CRM통합/Audit/AI지원/운영자UX/통합QA(6 Commit) | ✅ |
 | Sprint 3.5 | Platform Integration Architecture Review(READ ONLY) | ✅ |
 | Sprint 4 Commit 0 | Reservation Core Integration — 문서 Baseline(ADR-012, Reservation Core Architecture 등) | ✅ |
-| Sprint 4 Commit 1 | SSOT 문서 정렬(본 문서 갱신 포함) | 🔄 진행 중 |
+| Sprint 4 Commit 1 | SSOT 문서 정렬 | ✅ |
+| Sprint 4 Commit 2 | 예약 승인(Reservation Approval Foundation, ADR-014) | ✅ |
+| Sprint 4 Commit 3 | Slot 통합(Reservation Slot Integration) | ✅ |
+| Sprint 4 Commit 3A | Slot Integration Hardening(ADR-015 Draft) | ✅ |
 
 > **⚠️ 번호 체계 참고(문서 간 모순 검토로 발견, Sprint 4 Commit 1에서 표기만 정정)**: "Sprint 2"라는 이름이 위 표에서 **두 개의 서로 다른 트랙**을 가리킨다 — ① 기존 "Sprint 2 (Dashboard v3)"와 ② 이번 세션에서 진행한 "Single Admin Portal Sprint 2(Single Admin Portal Integration)". 두 트랙은 별개 작업이며 시점도 다르다. 과거 완료 이력을 소급 변경하지 않기 위해 기존 행은 그대로 두고 신규 행에 "Single Admin Portal" 접두어를 붙여 구분했다. 향후 Sprint 번호를 새로 붙일 때는 이 충돌을 참고해 트랙명을 함께 표기할 것을 권장한다.
 
@@ -107,11 +110,12 @@ STEP1.5 DateFix 실배포는 Google 계정 인증이 필요한 수동 작업이�
 | Commit | 내용 | 상태 |
 |---|---|---|
 | 0 | 문서 Baseline(ADR-012, Reservation Core Architecture 등) | ✅ 완료 |
-| 1 | SSOT 문서 정렬(본 문서 갱신 포함) | 🔄 진행 중 |
-| 2 | 예약 승인(Approval) | 🔲 대기 |
-| 3 | Slot(정원 관리) | 🔲 대기 |
+| 1 | SSOT 문서 정렬(본 문서 갱신 포함) | ✅ 완료 |
+| 2 | 예약 승인(Approval, Reservation Approval Foundation) | ✅ 완료 |
+| 3 | Slot(정원 관리, Reservation Slot Integration) | ✅ 완료 |
+| 3A | Slot Integration Hardening(상태검증 강화/중복점유 방지/Rollback Audit 명확화) | ✅ 완료(본 문서 갱신 포함) |
 | 4 | 문진(Questionnaire) | 🔲 대기 |
-| 5 | Legacy Admin(`admin/index.html`) 흡수 | 🔲 대기 |
+| 5 | Legacy Admin 흡수(Legacy Reservation Approval Consolidation 포함) | 🔲 대기(ARCHITECTURE.md §7-4 기술부채 참조) |
 | 6 | 통합 QA | 🔲 대기 |
 
 ### Sprint 5 — Patient Portal Integration (예정)

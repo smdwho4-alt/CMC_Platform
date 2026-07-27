@@ -2,7 +2,7 @@
 
 > **상태**: 제안(Sprint 4 Commit 3 Design Phase — PM 승인 후 `DECISIONS.md`에 정식 등재. 이 문서 자체가 신규 파일로서 초안 역할을 한다. `DECISIONS.md` 원본은 이번 단계에서 수정하지 않았다.)
 > **작성일**: 2026-07-28
-> **범위**: Google Sheets(SSOT, ADR-013) 예약의 승인/거절 상태 전이만 다룬다. Slot 상태(`Sprint4_Commit3_Slot_Capacity_Design_v1.0.md` §5)는 별도 개념이며 이 ADR의 범위 밖이다.
+> **범위**: Google Sheets(SSOT, ADR-013) 예약의 승인/거절 상태 전이만 다룬다. Slot 상태는 별도 개념이며 이 ADR의 범위 밖이다 — Slot 상태 정책은 Commit 3A(Hardening)에서 확정되어 `ADR-015_Slot_Status_Policy_Draft.md`(제안 단계)로 별도 문서화했다. 이 ADR을 Slot 상태 정책으로 과도하게 확장하지 않는다(PM 지시).
 
 ---
 

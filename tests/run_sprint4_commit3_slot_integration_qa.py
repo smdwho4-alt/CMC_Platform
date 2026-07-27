@@ -203,9 +203,13 @@ check("(9) DIRECTOR(reservation:approve 미보유) → 403", r.status_code == 40
 check("(9) 코드에 하드코딩된 역할명(ROLE-) 없이 permission 문자열만 사용",
       "roleId ==" not in _ROUTES_SRC.split("_reserve_slot_for_approval")[1].split("def _process_reservation_approval")[0])
 
-# (10) 409 / (11) 502 — 위에서 이미 개별 확인, 여기서는 상태 코드 매핑 표 일관성 재확인
-check("(10) 409는 SLOT_NOT_AVAILABLE/SLOT_FULL 두 코드만 신규 사용(기존 전이충돌 409와 별개)",
-      '"code": "SLOT_NOT_AVAILABLE"' in _ROUTES_SRC and '"code": "SLOT_FULL"' in _ROUTES_SRC)
+# (10) 409 / (11) 502 — 위에서 이미 개별 확인, 여기서는 상태 코드 매핑 표 일관성 재확인.
+# Sprint 4 Commit 3A(Hardening)에서 SLOT_BLOCKED/SLOT_ON_HOLD/SLOT_INVALID_STATE/
+# SLOT_RESERVATION_CONFLICT 4개가 추가되면서 코드가 _slot_error() 헬퍼로 통합됐다
+# (메시지 문자열 중복 방지, run_sprint4_commit3a_slot_hardening_qa.py가 전담 검증).
+# 이 파일은 Commit 3 원본 2개 코드가 여전히 유효한 코드 상수로 존재하는지만 재확인한다.
+check("(10) Commit 3 원본 코드(SLOT_NOT_AVAILABLE/SLOT_FULL)가 여전히 존재(Commit 3A 이후에도 회귀 없음)",
+      'SLOT_NOT_AVAILABLE' in _ROUTES_SRC and 'SLOT_FULL' in _ROUTES_SRC)
 check("(11) 502는 SHEETS_WRITE_FAILED 코드 사용", '"code": "SHEETS_WRITE_FAILED"' in _ROUTES_SRC)
 
 # (12) 동시 승인(순차 재현 — 실제 스레드 동시성은 DataLock의 프로세스 내 RLock으로 이미

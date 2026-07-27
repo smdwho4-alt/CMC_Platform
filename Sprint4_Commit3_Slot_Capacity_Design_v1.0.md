@@ -293,7 +293,47 @@ sequenceDiagram
 
 ---
 
-## 부록: 조사에서 확인되지 않은 항목
+## 부록 A. Commit 3A(Hardening) 반영 사항 — 2026-07-28 추가
+
+Commit 3 구현 이후 PM 조건부 승인에 따라 안전성·감사추적·중복처리 방지를 보강했다. 이 부록은 최초 설계(§1~§14)와 실제 구현(Commit 3A) 사이의 확정 사항을 기록한다 — 코드 재작성 없이 문서만 갱신했다.
+
+### A-1. Slot 상태 정책 확정(§5 갱신)
+
+§5에서 제안했던 `OPEN/FULL/CLOSED/BLOCKED`(Sheets 연동 관점 축약 상태)는 **채택하지 않았다.** 재조사 결과 Repository에 `OPEN`이라는 상태 문자열이 존재하지 않고, 정상 상태는 `AVAILABLE`이 유일함을 코드로 확인했다(`slot_generator.py` 기본값, `reservation_engine.py` 전역 사용). 최종 확정 정책:
+
+| 상태 | 승인 가능 여부 | 오류 코드 |
+|---|---|---|
+| `AVAILABLE` | ✅ 가능(유일한 허용 상태) | — |
+| `FULL` | ❌ | `SLOT_FULL` |
+| `BLOCKED` | ❌ | `SLOT_BLOCKED` |
+| `HOLD` | ❌ | `SLOT_ON_HOLD` |
+| `CLOSED`(현재 데이터에 실존하지 않음) | ❌ | `SLOT_NOT_AVAILABLE` |
+| `WAITING`(실존하나 PM 지시 목록에 없음) | ❌(catch-all 처리, Commit 3A 판단) | `SLOT_INVALID_STATE` |
+| 알 수 없는 값 / 빈 문자열 / `null` | ❌ | `SLOT_INVALID_STATE` |
+
+검증 순서는 **존재 확인 → 상태 확인 → Capacity 확인 → 중복 점유 확인 → 점유**로 확정했다(상태 확인이 Capacity보다 먼저 — 안전 우선 원칙).
+
+### A-2. 동일 예약 중복 점유 방지(신규, §4 보강)
+
+Slot에 `sheetsReservationNos`(예약번호 배열) 필드를 실제로 추가했다(§2에서 제안만 하고 미구현이었던 필드). 점유 시 이 배열에 예약번호를 추가하고, 승인 시도 시 **모든 Slot을 대상으로** 해당 예약번호가 이미 어딘가에 점유 기록으로 남아 있는지 확인한다 — 같은 Slot이든 다른 Slot이든 이미 있으면 `SLOT_RESERVATION_CONFLICT`로 차단하고 자동 정정하지 않는다.
+
+### A-3. Rollback 보상 Audit 구분(신규, §6 보강)
+
+Sheets 쓰기 실패로 인한 Slot 롤백은 `SLOT_RELEASED` Audit의 `note`에 `[ROLLBACK/COMPENSATION] reservationNo=... trigger=SHEETS_WRITE_FAILED`로 태그해 일반 예약취소(`{id} 취소로 Slot 복구`)와 명확히 구분한다. Rollback 자체가 실패하면(예: Slot 파일 쓰기 오류) `500 SLOT_ROLLBACK_FAILED`로 격상해 일반 Audit 실패(Best Effort)보다 눈에 띄게 만든다 — 새 로깅 시스템은 도입하지 않았다(Repository에 `logging` 모듈 사용 사례가 없음을 확인, 기존 관례인 예외 전파를 그대로 따름).
+
+### A-4. Legacy 승인 우회 — 공식 기술부채 등록
+
+`admin_reservations_v2_new.html`에서 상태를 직접 `예약확정`으로 변경하면 이번 Slot Workflow(존재/상태/Capacity/중복 검사, Audit)를 전혀 거치지 않는다. **`ARCHITECTURE.md` §7(알려진 아키텍처 부채)에 정식 등록했다**(본 문서 작성과 함께 별도 커밋으로 반영). 후속 작업명은 **Sprint 4 Commit 5 — Legacy Reservation Approval Consolidation**으로 제안한다.
+
+### A-5. Commit 3A 범위
+
+포함: Slot 상태 검증 강화, 중복 점유 방지, Rollback Audit 명확화, 동시성 테스트 강화, Legacy 우회 문서화, 문서 정합성 확보. 제외(Commit 3과 동일하게 유지): 예약변경/취소, 대기예약, AI 추천 Slot, 자동 재배정, 장비별 Capacity, 검진유형별 정원, Sheets/GAS 구조 변경, Legacy 기능 제거, 신규 Portal 탭, 신규 승인 API.
+
+### A-6. 다음 Commit 영향
+
+Slot 상태 정책이 확정되면서 향후 Phase 2(장비별 정원)·Phase 3(검진유형별 정원) 설계 시 `_SLOT_ALLOWED_STATUSES`/`_SLOT_STATUS_ERROR_CODES`(현재 `routes_admin_portal.py`에 위치)를 그대로 확장하면 된다 — 새 상태 모듈을 또 만들 필요가 없다. Commit 5(Legacy Admin 흡수) 착수 시 §A-4의 우회 경로를 반드시 재검토해야 한다.
+
+## 부록 B. 조사에서 확인되지 않은 항목
 
 - `reservation_v3_new.html`의 희망시간 입력이 자유 입력인지 정해진 목록 선택인지(§7 위험요소 근거) — 이번 세션에서 해당 파일의 시간 입력 UI 코드까지는 재확인하지 않음.
 - 실제 운영 중 시간대별/검사별 정원 수치(현재 코드 기본값 6은 임의값으로 보이며 실제 병원 운영 기준치는 확인되지 않음) — 병원 운영팀 확인 필요.

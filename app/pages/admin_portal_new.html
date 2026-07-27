@@ -836,6 +836,14 @@
     load(false);
   }
 
+  // Sprint 4 Commit 3A(Hardening): 승인 409 응답 중 Slot 관련 코드 전체 목록.
+  // 코드 문자열은 백엔드(_SLOT_MESSAGES, routes_admin_portal.py)와 이름만 맞추면
+  // 되고 문구 자체는 서버가 내려주므로 여기서는 중복 정의하지 않는다.
+  var _SLOT_CONFLICT_CODES = [
+    'SLOT_NOT_AVAILABLE', 'SLOT_FULL', 'SLOT_BLOCKED', 'SLOT_ON_HOLD',
+    'SLOT_INVALID_STATE', 'SLOT_RESERVATION_CONFLICT',
+  ];
+
   // Sprint 4 Commit 3(Reservation Slot Integration): 백엔드가 detail을
   // { code, message } 형태(SLOT_NOT_AVAILABLE/SLOT_FULL/SHEETS_WRITE_FAILED)로
   // 보낼 수도, 기존처럼 문자열로 보낼 수도 있어 양쪽 다 처리한다.
@@ -860,7 +868,11 @@
         if (r.status === 409) {
           return r.json().then(function (b) {
             var code = b.detail && b.detail.code;
-            if (code === 'SLOT_NOT_AVAILABLE' || code === 'SLOT_FULL') {
+            // Sprint 4 Commit 3A(Hardening): Slot 관련 409 코드는 전부 별도 토스트로
+            // 안내하고(기존 "이미 처리됨" 문구와 혼동되지 않게), 목록을 재조회한다.
+            // 메시지 문구는 서버(_SLOT_MESSAGES)가 내려주는 값을 그대로 표시한다
+            // (문구를 프론트에도 중복 정의하지 않음).
+            if (_SLOT_CONFLICT_CODES.indexOf(code) !== -1) {
               showToast(_extractDetailMessage(b, '예약 가능 여부를 확인할 수 없습니다.'), 'error');
               load(false);
               return null;

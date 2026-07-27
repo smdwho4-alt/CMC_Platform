@@ -103,3 +103,17 @@ PM이 요구한 `Lock → Capacity 검사 → Slot 점유 → Unlock` 순서를 
 - **Commit 4(문진)**: 이번 Commit은 문진 참조 키 전환에 영향을 주지 않는다(별개 관심사).
 - **Commit 5(Legacy Admin 흡수)**: `admin_reservations_v2_new.html`을 통한 Slot 우회(§12-4)를 이 시점에 반드시 재검토해야 한다 — 그 화면이 존치되는 한 Slot 정원 정책이 완전히 지켜지지 않는다.
 - **후속 Commit 후보**: BLOCKED/HOLD 처리(§12-1), 예약 변경/취소 시 Slot 복구(§12-2), 장비별·검진유형별 Capacity(Phase 2/3, 설계 문서 §3)는 전부 이번 Commit 범위 밖으로 남아 있다.
+
+---
+
+## Addendum — Commit 3A(Hardening) 반영 사항, 2026-07-28
+
+PM 조건부 승인에 따라 §12-1(BLOCKED/HOLD 처리)을 별도 Hardening Commit(`fix: harden reservation slot integration`)으로 해소했다. 본문(§1~§13)은 Commit 3 원본 그대로 보존하고, 변경 사항은 이 Addendum에 별도 기록한다(Commit amend 금지 원칙).
+
+- **§12-1 해소**: BLOCKED/HOLD/CLOSED/알수없음/빈값/null 상태를 전부 명시적으로 차단하도록 강화했다(`SLOT_BLOCKED`/`SLOT_ON_HOLD`/`SLOT_NOT_AVAILABLE`/`SLOT_INVALID_STATE`). 상세: `Sprint4_Commit3_Slot_Capacity_Design_v1.0.md` 부록 A-1.
+- **신규**: 동일 예약번호 중복 점유 방지(`sheetsReservationNos` 배열 도입, `SLOT_RESERVATION_CONFLICT`). 상세: 부록 A-2.
+- **신규**: Rollback 보상 Audit을 일반 취소와 구분(`[ROLLBACK/COMPENSATION]` 태그), Rollback 자체 실패 시 `500 SLOT_ROLLBACK_FAILED`로 격상. 상세: 부록 A-3.
+- **신규**: 동시성 테스트 강화(`ThreadPoolExecutor` 기반, sleep 미사용) — 동일 예약번호 동시 승인, 마지막 1자리 동시 승인 시나리오에서 정확히 1건만 성공하고 정원 초과·음수·중복 배열이 발생하지 않음을 확인.
+- **§12-4 정식 등록**: Legacy 승인 우회를 `ARCHITECTURE.md` §7(알려진 아키텍처 부채)에 공식 등록했다. 후속 작업명: **Sprint 4 Commit 5 — Legacy Reservation Approval Consolidation**.
+- **테스트**: `tests/run_sprint4_commit3a_slot_hardening_qa.py` 신규 59건 전부 PASS. `tests/run_sprint4_commit3_slot_integration_qa.py`(Commit 3 원본 스위트)의 코드-형태 의존 어서션 1건이 `_slot_error()` 헬퍼 도입으로 텍스트 형태가 바뀌어 일시 FAIL했으나, 동일 보장 내용을 유지하도록 어서션만 갱신해 재통과시켰다(기능 회귀 아님).
+- **CSV 개인정보 검증**: Commit 3/3A 관련 CSV 전수 검사 결과 실제 개인정보 없음(테스트명/결과/상세만 포함). 무관한 기존 커밋의 `sprint_g_test_result.csv`에서 더미 패턴(`010-0000-0003`, 명백한 자리표시자)만 발견 — Commit 3A 대상 아니므로 그대로 둠.

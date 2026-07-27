@@ -7,7 +7,7 @@ DataLock으로 Lock→Capacity검사→Slot점유 구간을 감쌈(동시성 원
 "(5) Slot 점유 반영(reservedCount 1, capacity 1 → FULL)",PASS,"(1, 'FULL')"
 응답에 slotId 포함,PASS,
 (3) Capacity FULL → 409,PASS,409
-(3) 409 code=SLOT_FULL,PASS,"{'detail': {'code': 'SLOT_FULL', 'message': '해당 일시(2026-08-01 09:00)의 예약 정원이 마감되었습니다.'}}"
+(3) 409 code=SLOT_FULL,PASS,"{'detail': {'code': 'SLOT_FULL', 'message': '해당 시간대의 예약 정원이 마감되었습니다.'}}"
 (3) FULL 재시도 후에도 정원 초과 점유 없음(reservedCount 여전히 1),PASS,
 (2) 매칭 Slot 없음 → 409,PASS,409
 (2) 409 code=SLOT_NOT_AVAILABLE,PASS,
@@ -24,7 +24,7 @@ DataLock으로 Lock→Capacity검사→Slot점유 구간을 감쌈(동시성 원
 (8) Audit.after에 slotId 포함(추적성),PASS,
 (9) DIRECTOR(reservation:approve 미보유) → 403,PASS,403
 (9) 코드에 하드코딩된 역할명(ROLE-) 없이 permission 문자열만 사용,PASS,
-(10) 409는 SLOT_NOT_AVAILABLE/SLOT_FULL 두 코드만 신규 사용(기존 전이충돌 409와 별개),PASS,
+(10) Commit 3 원본 코드(SLOT_NOT_AVAILABLE/SLOT_FULL)가 여전히 존재(Commit 3A 이후에도 회귀 없음),PASS,
 (11) 502는 SHEETS_WRITE_FAILED 코드 사용,PASS,
 (12) 정원 1인 Slot에 순차 요청 시 하나만 성공,PASS,"200, 409"
 (12) 정원 초과 점유 없음(reservedCount == capacity 정확히 유지),PASS,
@@ -34,7 +34,7 @@ GAS(sheets_api_v3_final.gs) 무수정 확인,PASS,
 로컬 JSON 승인 API 소유 파일(api_server.py) 무수정 확인,PASS,
 "reservation_engine.py 무수정 확인(재사용만, 수정 없음)",PASS,
 slot_generator.py 무수정 확인,PASS,
-Slot 통합 코드 블록 추출 성공(진단용),PASS,2171
+Slot 통합 코드 블록 추출 성공(진단용),PASS,4854
 대기예약(WAITING) 관련 신규 로직 없음,PASS,
 alternative_slot_recommender(AI 추천 Slot) 호출 없음,PASS,
 Equipment.capacityPerHour 실사용 없음(Commit4 이후 범위),PASS,
