@@ -29,7 +29,7 @@
 - **결정**: SQLite/PostgreSQL 등 DB 서버 대신 JSON 파일(`data/*.json`) + 파일 락(`FileJsonLock`) 기반으로 구축. 빠른 개발 속도와 낮은 운영 부담을 우선.
 - **대안 검토**: SQLite 마이그레이션 계획은 문서화해 둠(`docs/SQLite_Migration_Plan.md`)하되 착수하지 않음.
 - **상태**: ✅ 확정(파일럿 단계 기준). 트래픽 증가 시 재검토 필요 — [ROADMAP.md](ROADMAP.md) SQLite 마이그레이션 항목 참조.
-- **부채**: Google Sheets(예약 원장) ↔ 로컬 JSON(Core Data Layer) 이원화 미해결. ARCHITECTURE.md §7 참조.
+- **부채**: Google Sheets(예약 원장) ↔ 로컬 JSON(Core Data Layer) 이원화는 **`Reservation` Entity에 한해 ADR-013으로 해소**(Sheets를 SSOT로 확정, 2026-07-27). `Patient`/`CRM`/`AuditLog` 등 나머지 Entity는 이원화 이슈 자체가 없었으므로(로컬 JSON 단일 저장) 영향 없음. ARCHITECTURE.md §1/§7 참조.
 
 ---
 
@@ -63,7 +63,7 @@
 - **배경**: 기존 `admin_reservations_new.html`(localStorage 기반)이 이미 운영 중. Sheets 연동판으로 교체 시 회귀 리스크.
 - **결정**: `admin_reservations_v2_new.html`을 신규로 추가하고 원본은 보존. 범위는 목록/상세/상태변경/메모저장으로 한정(대시보드/권한관리는 제외). 상태변경·메모저장에는 Lock 필수 적용. 메모 필드는 `update` 액션으로 `{note}` 단일 필드만 전송(옵션 A로 확정, PM 2차 승인).
 - **대안 검토**: 기존 파일 직접 수정(회귀 리스크로 기각), 메모를 별도 이력 배열로 관리(옵션 B, 과설계로 기각).
-- **상태**: ✅ 설계 확정(`DEV-003_..._Design_Final_new.md`). ⚠️ **구현 미착수** — ROADMAP.md 참조.
+- **상태**: ✅ **구현 완료**(2026-07-12, Live 검증 포함 — PROJECT_STATUS.md §2-1 참조). *(Sprint 4 Commit 1에서 정정: 종전 "⚠️ 구현 미착수" 표기는 DEV-003 완료 이후 갱신되지 않은 낡은 정보였음)*
 
 ---
 
@@ -71,7 +71,7 @@
 
 - **배경**: 이 프로젝트는 git 저장소로 초기화되지 않았고, 상위 폴더(건강검진)의 작업 규칙("기존 파일 덮어쓰지 않음, 새 파일은 `_new` 접미사")을 그대로 계승해왔다.
 - **결정**: `_v2`, `_v3`, `_final`, `_new` 등 파일명 접미사로 버전 이력을 관리. Architecture Freeze 문서(CLAUDE.md 등 5종)는 향후 세션에서 지침으로 실제 동작해야 하므로 표준 파일명(접미사 없음)으로 예외 적용(2026-07-04 사용자 확정).
-- **상태**: ✅ 확정. 단, 코드 변경 이력 추적의 한계는 알려진 부채로 남김(ARCHITECTURE.md §7).
+- **상태**: ⚠️ **Superseded by ADR-012**(2026-07-28). 이 ADR이 전제한 "git 저장소로 초기화되지 않았다"는 배경은 결정 직후인 2026-07-06에 git 저장소가 실제로 초기화되면서 사실과 어긋나기 시작했고, 이후 커밋 기반 운영이 계속됐다(Sprint 4 Architecture Gate에서 확인). 파일명 접미사 관행 자체는 ADR-012에서도 보조 수단으로 유지되므로 이 ADR 원문은 삭제하지 않고 이력으로 보존한다.
 
 ---
 
@@ -105,3 +105,23 @@
 - 구조 변경이 필요한 항목(§`docs/STRUCTURE_REORG_ANALYSIS_new.md` §9 "Pilot 이후 정리 대상" 포함, `src/`·`app/` 내부 재편 등)은 전부 **Pilot 종료 후 v1.0 작업으로 이관**한다.
 - **대안 검토**: 구조 재편(저위험 15개 파일 이동)을 먼저 수행한 뒤 DateFix 작업 착수(기각 — 급하지 않은 정리 작업이 Critical 이슈 해결보다 먼저 진행될 이유가 없고, 리소스가 분산됨).
 - **상태**: ✅ 확정 (2026-07-04). 구조 관련 모든 논의는 `docs/STRUCTURE_REORG_ANALYSIS_new.md`를 기준으로 하며, 실제 이동/재편 착수는 v1.0 단계에서 별도 승인 후 진행한다.
+
+---
+
+## ADR-012: 버전 관리는 Git 커밋 기반으로 운영한다 (Supersedes ADR-008)
+
+- **배경**: ADR-008(2026-07-04)은 "git 저장소로 초기화되지 않았다"는 전제로 파일명 접미사만을 버전 관리 수단으로 결정했으나, 불과 2일 뒤인 2026-07-06에 git 저장소가 실제로 초기화되어(최초 커밋 `0d6e3a2`) 이후 오늘까지 커밋 기반 운영이 예외 없이 계속됐다(`v1.0.0-pilot`/`v1.1.0-beta1` 태그가 origin에도 push됨, Single Admin Portal Sprint 1~3 전체가 Commit 단위로 진행됨). Sprint 4 Architecture Gate에서 이 불일치가 공식 식별됐다.
+- **결정**: 이 프로젝트의 버전 관리는 **Git 커밋을 기준**으로 운영한다. 파일명 접미사(`_new`/`_v2`/`_v3`/`_final`) 관행은 폐지하지 않고 상위 폴더 규칙 계승 및 "원본 파일 무수정 원칙"을 위한 **보조 수단**으로 병행 유지한다. `git add .`/`git add -A` 금지, 커밋 전 `git diff --cached --name-only` 확인, PM이 명시 승인한 경우에만 push하는 원칙을 확정한다. 상세 정책(Branch/Commit/Release)은 `ADR-012_Git_Based_Version_Control.md`를 정식 근거 문서로 삼는다.
+- **대안 검토**: 파일명 접미사 체계로 전면 회귀(기각 — 이미 32개 커밋과 2개 릴리스 태그가 git에 쌓여 있어 회귀 시 이력 손실), git과 파일명 접미사 중 하나만 남기고 완전 통일(기각 — 두 체계 모두 실사용 근거가 있어 공존을 인정하는 쪽이 현실적).
+- **상태**: ✅ **Accepted** (2026-07-28, Sprint 4 Commit 1). ADR-008을 Supersede한다.
+
+---
+
+## ADR-013: 예약(Reservation) Master Data / SSOT는 Google Sheets로 확정한다
+
+- **배경**: 예약 데이터가 Google Sheets(수검자 웹 폼 경로)와 로컬 JSON(`reservation_engine.py`, AI 채팅·관리자 콘솔 경로) 두 저장소에 나뉘어 있고 상호 동기화 코드가 없음이 `Platform_Integration_Architecture_Review_v1.0.md`(Sprint 3.5)와 `Sprint4_Architecture_Gate_Report_v1.0.md`(Sprint 4 Architecture Gate)에서 확인됐다. Single Admin Portal(Sprint 1~3)을 포함한 통합 작업을 진행하려면 공식 원장을 하나로 확정해야 한다.
+- **결정**: **예약 Master Data(SSOT)는 Google Sheets로 확정한다.** 계층 역할은 Google Sheets(Data/SSOT) → Google Apps Script(Integration Layer) → FastAPI(Business/Security/AI Layer) → Single Admin Portal(Presentation Layer)로 정의한다(ARCHITECTURE.md §1 계층 구조 참조). **기존 로컬 JSON 예약 데이터(`data/reservations.json`)는 삭제하지 않으며, 신규 예약의 공식 원장으로는 더 이상 사용하지 않되 기존 기능 호환·테스트 Fixture·마이그레이션 검증·Rollback 참고 용도로 유지한다.** 이 결정은 `Reservation` Entity에 한정되며, `Patient`/`CRM`/`AuditLog` 등 나머지 19개 Core Data Layer Entity(ADR-003)의 로컬 JSON 저장 방식에는 영향을 주지 않는다.
+- **근거**: 상세 필드 매핑·ID 충돌·상태값 매핑·PII·마이그레이션 범위 분석은 `Reservation_Data_Mapping_and_Migration_Plan_v1.0.md`, 계층별 목표 흐름(예약/승인/Slot/문진)은 `Reservation_Core_Architecture_v1.0.md`를 정식 근거 문서로 삼는다. 현재 로컬 JSON 예약 데이터는 5건(전부 QA 더미)으로 확인되어 이관 부담이 낮다.
+- **대안 검토**: 로컬 JSON(Core Data Layer)을 SSOT로 삼고 Sheets를 리포팅 전용 미러로 전환(기각 — 수검자 웹 폼의 유일한 실제 접수 경로가 이미 Sheets이고, Single Admin Portal이 이미 Sheets 조회 기준으로 구축되어 있어 전환 비용이 더 큼).
+- **영향**: 승인 게이트(현재 로컬 JSON에만 존재)·Slot 정원 통제(현재 로컬 JSON에만 존재)·문진 참조 키(현재 로컬 JSON `Reservation.id` 참조)를 Sheets 기준으로 재설계해야 하는 과제가 남으며, 각각 Sprint 4 Commit 2/3/4의 PM 승인 대상이다(`Sprint4_Implementation_Plan_v1.0.md` 참조).
+- **상태**: ✅ **Accepted** (2026-07-27, PM 최종 결정 — Sprint 4 Commit 0/1에서 문서 반영).

@@ -14,7 +14,7 @@
 | Phase 4 | Apps Script Web App 경유 연동 (18컬럼) | ✅ |
 | Phase 4.5 | 예약 시트 29컬럼 확장 + ERD/워크플로우 문서화 | ✅ |
 | STEP0-1 | 예약 쓰기 경로 배선·검증 | ✅ |
-| STEP1.5 | DateFix QA — 결함 발견 및 수정 코드 작성 | ⚠️ 코드 완료, **배포 미반영** (PROJECT_STATUS.md 참조) |
+| STEP1.5 | DateFix QA — 결함 발견 및 수정 코드 작성 | ✅ **완료**(2026-07-12, GAS Version 5 재배포·재QA까지 완료 — PROJECT_STATUS.md §1/§2 참조) |
 | Sprint A | Core Data Layer (20 Entity JSON, 로더/검증) | ✅ |
 | Sprint B | Reservation Engine (상태머신, Slot, 감사로그) | ✅ |
 | Sprint C | Admin Console (7개 메뉴, Mock API) | ✅ |
@@ -24,7 +24,17 @@
 | Sprint G | Claude API 연동, 세션/Rate Limit/AI Dashboard | ✅ |
 | Sprint H | 파일럿 전환 절차, 장애 대응, 백업·복구 | ✅ |
 | Sprint I | 품질 게이트 (16항목) — PASS | ✅ |
-| Sprint 2 | Dashboard v3 (운영센터, KPI 6종, AI 추천) | ✅ |
+| Sprint 2 *(Dashboard 트랙)* | Dashboard v3 (운영센터, KPI 6종, AI 추천) | ✅ |
+| DEV-003 | 관리자 예약관리 Sheets Live 연동(`admin_reservations_v2_new.html`) | ✅ **완료**(2026-07-12, 테스트 60/60 PASS, Live 검증 완료 — PROJECT_STATUS.md §2-1 참조) |
+| DEV-004 | 종합검진 선택검사 Rule 기반 UI 전면 개편 | ✅ **완료**(2026-07-12, `v1.1.0-beta1` 태그) |
+| Single Admin Portal Sprint 1 *(별도 번호 트랙, 위 "Sprint 2 (Dashboard 트랙)"과 무관)* | Admin Portal Integration Foundation — 조회 계층/관리자 조회 API/Portal 셸 | ✅ |
+| Single Admin Portal Sprint 2 | Single Admin Portal Integration — Dashboard/예약조회/예약상세/통계 | ✅ |
+| Single Admin Portal Sprint 3 | Operator First — RBAC/CRM통합/Audit/AI지원/운영자UX/통합QA(6 Commit) | ✅ |
+| Sprint 3.5 | Platform Integration Architecture Review(READ ONLY) | ✅ |
+| Sprint 4 Commit 0 | Reservation Core Integration — 문서 Baseline(ADR-012, Reservation Core Architecture 등) | ✅ |
+| Sprint 4 Commit 1 | SSOT 문서 정렬(본 문서 갱신 포함) | 🔄 진행 중 |
+
+> **⚠️ 번호 체계 참고(문서 간 모순 검토로 발견, Sprint 4 Commit 1에서 표기만 정정)**: "Sprint 2"라는 이름이 위 표에서 **두 개의 서로 다른 트랙**을 가리킨다 — ① 기존 "Sprint 2 (Dashboard v3)"와 ② 이번 세션에서 진행한 "Single Admin Portal Sprint 2(Single Admin Portal Integration)". 두 트랙은 별개 작업이며 시점도 다르다. 과거 완료 이력을 소급 변경하지 않기 위해 기존 행은 그대로 두고 신규 행에 "Single Admin Portal" 접두어를 붙여 구분했다. 향후 Sprint 번호를 새로 붙일 때는 이 충돌을 참고해 트랙명을 함께 표기할 것을 권장한다.
 
 ---
 
@@ -40,67 +50,97 @@
 
 Pilot용 프로젝트 구조는 **v0.9.0 현재 상태로 Freeze**한다. 구조 변경(§ `docs/STRUCTURE_REORG_ANALYSIS_new.md` 참조)은 착수하지 않으며, `docs/STRUCTURE_REORG_ANALYSIS_new.md`를 구조 관련 기준 문서(baseline)로 삼는다(DECISIONS.md ADR-011). 구조 변경이 필요한 작업은 전부 **Pilot 종료 후 v1.0 작업으로 이관**한다.
 
-Pilot 전 최우선 작업은 다음 순서로 진행한다.
+Pilot 전 최우선 작업은 다음 순서로 진행했다(**Sprint 4 Commit 1 기준 3단계 모두 완료 확인** — 아래는 완료 이력이며, 이 섹션이 서술하는 "대기 중" 상태는 더 이상 현재 상태가 아니다).
 
 ```
-1) STEP1.5 DateFix   ✅ 코드 수정+회귀테스트 완료 (2026-07-04) / 🔴 실배포 대기 (사용자 조치)
+1) STEP1.5 DateFix   ✅ 완료 (코드 2026-07-04 / 실배포 2026-07-12, GAS Version 5)
       ↓
 2) 전체 QA           ✅ 완료 (Sprint A/B/D/E/I 재실행, 150건+13/2/1/0, 회귀 없음)
       ↓
-3) v0.9.0 Pilot Release   ⏳ 대기 (1의 실배포 확인 후 진행)
+3) v0.9.0 → v1.0.0-pilot Pilot Release   ✅ 완료 (2026-07-12, 태그 생성·push 완료 — PROJECT_STATUS.md §1 참조)
 ```
 
-이 순서를 따르는 동안 구조 변경, DEV-003 구현 등 다른 작업은 후순위로 미룬다. STEP1.5 DateFix의 코드 수정·테스트는 완료되었으나 Google Apps Script 실배포는 Google 계정 인증이 필요한 수동 작업이라 에이전트가 대신 수행할 수 없다 — 상세: [STEP1.5.2_DateFix_Complete_new.md](STEP1.5.2_DateFix_Complete_new.md), [PROJECT_STATUS.md](PROJECT_STATUS.md) §2.
+STEP1.5 DateFix 실배포는 Google 계정 인증이 필요한 수동 작업이라 에이전트가 대신 수행할 수 없었으나, 2026-07-12에 사용자가 직접 수행 완료했다 — 상세: [STEP1.5.2_DateFix_Complete_new.md](STEP1.5.2_DateFix_Complete_new.md), [PROJECT_STATUS.md](PROJECT_STATUS.md) §2. 이 3단계 완료 이후 DEV-003·DEV-004·Single Admin Portal Sprint 1~3·Sprint 3.5·Sprint 4가 순차 진행됐다(위 "완료된 작업" 표 참조).
 
 ---
 
-## Sprint J 이전 필수 해결 과제 (Pilot Ready 전제조건)
+## Sprint J 이전 필수 해결 과제 (Pilot Ready 전제조건) — ⚠️ "Sprint J" 명칭은 아래 §Sprint 4~6으로 대체됨
+
+> **번호 체계 정정(Sprint 4 Commit 1)**: 이 섹션이 사용하는 "Sprint J"라는 잠정 명칭은 실제로 도래하지 않았고, 그 사이 PM이 Single Admin Portal Sprint 1~3(별도 트랙)과 Sprint 3.5(Architecture Review)를 진행시킨 뒤 "Sprint 4/5/6"으로 신규 기능 개발 재개 로드맵을 공식 확정했다(§"다음 단계" 하단 참조). 이 표는 **이력 보존을 위해 원문을 남기고**, 상태만 최신화한다.
 
 | 과제 | 상태 | 비고 |
 |---|---|---|
 | **STEP1.5 DateFix 코드 수정** | ✅ **완료** (2026-07-04) | `_actionCreate`/`_rowToObj`(STEP1.5.1) + `_actionUpdate`/`_actionSummary`(STEP1.5.2) 하드닝. STEP1.5.2_DateFix_Complete_new.md |
-| **STEP1.5 DateFix 실배포 + 재QA** | 🔴 미해결, **최우선(사용자 조치)** | Apps Script "새 버전" 배포 필요, 에이전트가 대신 수행 불가. PROJECT_STATUS.md §2 |
+| **STEP1.5 DateFix 실배포 + 재QA** | ✅ **완료**(2026-07-12, GAS Version 5, 사용자 수행) | PROJECT_STATUS.md §1/§2 |
 | 전체 QA (회귀 테스트 스위트 + 시나리오 리허설) | ✅ 완료 (2026-07-04) | Sprint A(30)/B(38)/D(36)/E(31) + Sprint I 품질게이트(13/2/1/0) + DateFix Node 테스트(15) = 150건 FAIL 0 |
-| DEV-003 구현 | ⚠️ 설계만 확정, 후순위 | `admin_reservations_v2_new.html` 신규 작성, Lock 적용(DECISIONS.md ADR-007) |
-| 더미 데이터/계정 정리 | 대기, 후순위 | `data/reservations.json` QA 더미, `data/users.json` 더미 3계정 |
-| 프로젝트 구조 재편 | 🚫 **Pilot 기간 중 착수하지 않음** | v1.0 작업으로 이관(DECISIONS.md ADR-011), 기준 문서: `docs/STRUCTURE_REORG_ANALYSIS_new.md` |
+| DEV-003 구현 | ✅ **완료**(2026-07-12) | `admin_reservations_v2_new.html` 신규 작성 완료, 테스트 60/60 PASS, Live 검증 완료. PROJECT_STATUS.md §2-1 |
+| 더미 데이터/계정 정리 | 🔲 여전히 대기 | `data/reservations.json` QA 더미, `data/users.json` 더미 3계정 — Sprint 4~6 기간 중 처리 시점 미정 |
+| 프로젝트 구조 재편 | 🚫 **여전히 착수하지 않음** | v1.0 작업으로 이관(DECISIONS.md ADR-011), 기준 문서: `docs/STRUCTURE_REORG_ANALYSIS_new.md`. Sprint 4~6 기간에도 이 원칙 유지 |
 
-이 표의 항목이 모두 해소되기 전에는 Sprint J(신규 기능 개발 재개) 착수 및 Pilot Ready 선언을 하지 않는다. 단, DEV-003과 더미 데이터 정리는 §"구조 Freeze 및 최우선 작업 순서"의 1~3단계 완료 이후로 순서를 조정한다.
+위 6개 과제 중 4개는 완료됐다(STEP1.5 코드·배포, 전체 QA, DEV-003). **남은 2개(더미 데이터/계정 정리, 프로젝트 구조 재편)는 Sprint 4 착수 시점에도 여전히 미해소 상태다** — Sprint 4가 이미 시작됐으므로, "이 표가 모두 해소되기 전에는 신규 기능 개발을 시작하지 않는다"는 원래 원칙은 사실상 완화되어 적용된 것으로 봐야 한다(PM이 Sprint 4를 명시적으로 승인·착수시켰기 때문). 이 완화 자체를 소급 정당화하는 것이 이 섹션의 목적은 아니며, 남은 2개 과제가 여전히 미해소라는 사실만 정확히 기록해 둔다.
 
 ---
 
-## 다음 단계 (Sprint 0 이후 후보)
+## 다음 단계 — 이력 (Sprint 0 이후, Sprint 4 이전에 완료된 항목)
 
-### IMMEDIATE (최우선 순서 — 위 "구조 Freeze 및 최우선 작업 순서" 참조)
+### IMMEDIATE — ✅ 전부 완료(이력 보존)
 
-1. **STEP1.5 DateFix 실배포** — 코드 수정 완료, Apps Script "새 버전" 배포는 사용자 조치 필요 + 재QA. (PROJECT_STATUS.md §2)
+1. **STEP1.5 DateFix 실배포** — ✅ 완료(2026-07-12, GAS Version 5)
 2. **전체 QA** — ✅ 완료 (Sprint A/B/D/E/I 재실행 + DateFix 회귀 테스트, 150건 FAIL 0)
-3. **v0.9.0 Pilot Release** — 1의 실배포 확인 후 개시
+3. **v0.9.0 → v1.0.0-pilot Pilot Release** — ✅ 완료(2026-07-12, 태그 생성·push 완료)
 
-### IMMEDIATE 이후 (Pilot Release 후 순차 진행)
+### IMMEDIATE 이후 — ✅ 완료
 
-4. **DEV-003 구현** — `admin_reservations_v2_new.html` 신규 작성, Lock 적용, 설계는 이미 확정됨(DECISIONS.md ADR-007).
-5. **더미 데이터/계정 정리** — `data/reservations.json` QA 더미, `data/users.json` 더미 3계정.
+4. **DEV-003 구현** — ✅ 완료(2026-07-12, 테스트 60/60 PASS, Live 검증 완료)
+5. **더미 데이터/계정 정리** — 🔲 **여전히 미착수**(Sprint 4 착수 시점 기준)
 
-### SHORT-TERM (2~3주)
+---
 
-6. **LLM 기반 의도 분류 전환 검토** — 현재 규칙 기반이 기본, Claude API는 옵트인. 전환 여부는 별도 ADR로 결정 필요.
-7. **실키 실호출 스모크 테스트** — `CSHSP_SMOKE_LIVE=1`로 1회 실행, 과금·응답 검증.
-8. **관리자 인증(로그인) 구현** — 현재 미구현, 운영 전 필수.
-9. **HTTPS 적용** — 현재 시제품 미적용, 운영 전 필수.
-10. **실인증/실발송 연동** — 현재 Mock, Pilot Conditional Go 조건 해소용(PILOT_READINESS_REVIEW.md §3 참조).
+## Sprint 4~6 로드맵 (PM 확정, 2026-07-27/28)
 
-### MEDIUM-TERM (1개월 이상, v1.0 후보)
+위 IMMEDIATE 단계 완료 이후, Single Admin Portal Sprint 1~3(별도 트랙)·Sprint 3.5(Architecture Review)를 거쳐 PM이 신규 기능 개발 재개를 아래 3개 Sprint로 공식 확정했다(과거 "Sprint J"라는 잠정 명칭을 대체).
 
-11. **프로젝트 구조 재편** — `docs/STRUCTURE_REORG_ANALYSIS_new.md` 기준으로 v1.0 단계에서 착수 여부 재검토(DECISIONS.md ADR-011).
-12. **SQLite 마이그레이션 검토** — `docs/SQLite_Migration_Plan.md` 기반, JSON 대비 성능/동시성 비교 후 착수 여부 결정.
-13. **파일럿 운영** — 일일 체크리스트(`CSHSP_Pilot_Daily_Checklist.md`) 가동, Stop Criteria 모니터링(`CSHSP_Pilot_Stop_Criteria.md`).
-14. **Go-Live 준비** — Go-Live 기준(`CSHSP_GoLive_Decision_Criteria.md`) 충족 확인.
+### Sprint 4 — Reservation Core Integration (진행 중)
+
+예약(Reservation) 도메인을 Google Sheets SSOT(ADR-013) 기준으로 통합한다. Commit별 상세는 `Sprint4_Implementation_Plan_v1.0.md` 참조.
+
+| Commit | 내용 | 상태 |
+|---|---|---|
+| 0 | 문서 Baseline(ADR-012, Reservation Core Architecture 등) | ✅ 완료 |
+| 1 | SSOT 문서 정렬(본 문서 갱신 포함) | 🔄 진행 중 |
+| 2 | 예약 승인(Approval) | 🔲 대기 |
+| 3 | Slot(정원 관리) | 🔲 대기 |
+| 4 | 문진(Questionnaire) | 🔲 대기 |
+| 5 | Legacy Admin(`admin/index.html`) 흡수 | 🔲 대기 |
+| 6 | 통합 QA | 🔲 대기 |
+
+### Sprint 5 — Patient Portal Integration (예정)
+
+수검자(Patient) 측 Portal 통합. `Platform_Integration_Architecture_Review_v1.0.md` §6(권장 Portal 구조)에서 식별된 신규 페이지(Home/검진안내/검진프로그램/예약조회/My Page)와 AI 채팅 위젯 실제 임베드를 포함할 것으로 예상되나, 착수 시점에 별도 Implementation Plan으로 범위를 확정한다. 아래 기존 SHORT-TERM 후보 중 수검자 접점과 관련된 항목이 이 Sprint의 후보다.
+
+- **실인증/실발송 연동** — 현재 Mock, Pilot Conditional Go 조건 해소용(PILOT_READINESS_REVIEW.md §3 참조)
+- **관리자 인증(로그인) 구현** — 현재 미구현, 운영 전 필수(수검자 My Page 인증과 함께 설계 검토 가능)
+
+### Sprint 6 — Pilot Ready (예정)
+
+Sprint 4~5로 통합된 플랫폼 기준의 파일럿 재검증. 아래 기존 MEDIUM-TERM/SHORT-TERM 후보 중 운영 준비 관련 항목이 이 Sprint의 후보다.
+
+- **HTTPS 적용** — 현재 시제품 미적용, 운영 전 필수
+- **실키 실호출 스모크 테스트** — `CSHSP_SMOKE_LIVE=1`로 1회 실행, 과금·응답 검증
+- **더미 데이터/계정 정리** — 위 §"Sprint J 이전 필수 해결 과제"에서 여전히 미해소로 확인된 항목
+- **파일럿 운영** — 일일 체크리스트(`CSHSP_Pilot_Daily_Checklist.md`) 가동, Stop Criteria 모니터링(`CSHSP_Pilot_Stop_Criteria.md`)
+- **Go-Live 준비** — Go-Live 기준(`CSHSP_GoLive_Decision_Criteria.md`) 충족 확인
+
+### 시점 미정(Sprint 4~6 어디에도 아직 배정되지 않음)
+
+- **LLM 기반 의도 분류 전환 검토** — 현재 규칙 기반이 기본, Claude API는 옵트인. 전환 여부는 별도 ADR로 결정 필요.
+- **프로젝트 구조 재편** — `docs/STRUCTURE_REORG_ANALYSIS_new.md` 기준, v1.0 단계에서 착수 여부 재검토(DECISIONS.md ADR-011). Sprint 4~6 기간에도 착수하지 않는다.
+- **SQLite 마이그레이션 검토** — `docs/SQLite_Migration_Plan.md` 기반, JSON 대비 성능/동시성 비교 후 착수 여부 결정.
 
 ---
 
 ## 보류/미착수 (우선순위 미정)
 
-- 이중 백엔드(Sheets ↔ 로컬 JSON) 통합 여부 결정
-- git 버전관리 도입 여부 (현재 파일명 접미사로 대체, DECISIONS.md ADR-008)
-- 프로젝트 구조 재편 (v1.0 이관, DECISIONS.md ADR-011)
+- 이중 백엔드(Sheets ↔ 로컬 JSON) 통합 여부 결정 — ✅ **Reservation Entity에 한해 해소**(ADR-013, Sheets를 SSOT로 확정). 나머지 Entity는 애초에 해당 없음.
+- git 버전관리 도입 여부 — ✅ **해소**(ADR-012, Git 커밋 기반 운영으로 확정. ADR-008은 Superseded)
+- 프로젝트 구조 재편 (v1.0 이관, DECISIONS.md ADR-011) — 여전히 보류

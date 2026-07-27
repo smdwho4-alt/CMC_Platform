@@ -13,7 +13,20 @@ CMC Platform은 세 개의 실행 영역으로 구성된다.
 2. **Backend (Python)** — FastAPI 기반 REST API + AI 에이전트 오케스트레이션
 3. **Backend (Google Apps Script)** — Google Sheets를 예약 원장(ledger)으로 사용하는 별도 백엔드
 
-두 백엔드(Python API / Apps Script)는 **독립적으로 존재**하며, 예약 데이터의 최종 저장소는 현재 **Google Sheets**(Apps Script 경유)와 **로컬 JSON**(`data/`, Python 계층)으로 이원화되어 있다. 이는 개발 단계별로 순차 도입된 결과이며, 향후 일원화 필요 여부는 [DECISIONS.md](DECISIONS.md)에서 다룬다.
+### 1-1. 계층 구조(Layer Model) — Reservation Core 기준(ADR-013, 2026-07-27 확정)
+
+예약(Reservation) 도메인은 아래 4계층으로 통일한다. 상세 흐름(예약/승인/Slot/문진)은 `Reservation_Core_Architecture_v1.0.md`를 정식 근거 문서로 삼는다.
+
+| 계층 | 구성요소 | 책임 |
+|---|---|---|
+| **Presentation** | Single Admin Portal(`admin_portal_new.html`), 수검자 웹 폼(`reservation_v3_new.html`) 등 | 사용자 화면 |
+| **Business** | FastAPI(`src/api/*`, `src/agents/*`) | 인증·RBAC·승인 워크플로·감사로그·AI 오케스트레이션 |
+| **Integration** | Google Apps Script(`sheets_api_v3_final.gs`) | Sheets 접근 중개(action 기반 API) |
+| **Data** | **Google Sheets**(예약 Master Data / SSOT) | 예약 데이터의 유일한 영구 저장소 |
+
+**예약(Reservation) 데이터의 공식 SSOT는 Google Sheets로 확정됐다(ADR-013).** 기존 로컬 JSON 예약 데이터(`data/reservations.json`)는 삭제하지 않으나 신규 예약의 공식 원장으로는 더 이상 사용하지 않으며, 기존 기능 호환·테스트 Fixture·마이그레이션 검증·Rollback 참고 용도로만 유지한다. **이 결정은 `Reservation` Entity에 한정된다** — `Patient`/`CRM`/`AuditLog` 등 나머지 19개 Core Data Layer Entity(ADR-003)는 여전히 로컬 JSON(`data/`)이 유일한 저장소이며 이번 결정의 영향을 받지 않는다.
+
+승인 게이트(현재 로컬 JSON에만 존재하는 `REQUESTED→PENDING_APPROVAL→CONFIRMED` 워크플로)·Slot 정원 통제(현재 로컬 JSON에만 존재)·문진 참조 키(현재 로컬 JSON `Reservation.id` 참조) 3가지는 Sheets 기준으로 아직 재설계되지 않은 **진행 중인 과제**이며, Sprint 4 Commit 2/3/4에서 PM 승인 후 다룬다(`Sprint4_Implementation_Plan_v1.0.md` 참조). 즉 이 문서 작성 시점(Sprint 4 Commit 1)에는 **SSOT 지정만 확정됐고, 계층 간 재배선(코드 변경)은 아직 이뤄지지 않았다.**
 
 ---
 
@@ -63,7 +76,7 @@ CMC_Platform_new/
 | 데이터 저장 | JSON 파일 (20 Entity, `data/`) — append-only 감사로그/AI 이벤트 |
 | 예약 원장 저장 | Google Sheets (29컬럼, Apps Script `sheets_api_v3_final.gs` 경유) |
 | 배포 | 로컬 웹서버(`npx serve`/`http.server`) + Windows Task Scheduler(NSSM) |
-| 버전 관리 | 없음 (git 미사용, 파일명에 `_v2/_v3/_final/_new` 등 버전 접미사로 이력 관리) |
+| 버전 관리 | **Git 커밋 기반**(ADR-012, 2026-07-06 저장소 초기화 이후 표준) + 파일명 접미사(`_v2/_v3/_final/_new`, 상위 폴더 규칙 계승, 보조 수단) 병행 |
 
 ---
 
@@ -156,8 +169,8 @@ chat/chat_widget.js (SSE)
 
 ## 7. 알려진 아키텍처 부채
 
-1. **이중 백엔드**: Google Sheets(Apps Script) vs 로컬 JSON(Python) — 두 저장소가 동기화되어 있지 않음. 관리자 콘솔은 아직 로컬 JSON/Mock API 기준으로 동작하고, 환자용 예약 화면은 Sheets 기준으로 동작.
-2. **버전 관리 부재**: git 미사용, 파일명 접미사(`_v2`, `_v3`, `_final`, `_new`)로 이력 관리 — 롤백/diff 추적 어려움.
+1. **이중 백엔드(Reservation 한정, 부분 해소)**: Google Sheets(Apps Script) vs 로컬 JSON(Python) — 예약(Reservation) 데이터에 한해 SSOT가 Google Sheets로 확정됐다(ADR-013). 다만 승인 게이트·Slot 정원 통제·문진 참조 키의 실제 재배선(코드 변경)은 아직 완료되지 않았다(Sprint 4 Commit 2~4 대상) — **SSOT 지정과 실제 구현 정합화는 별개 단계**임에 유의. `Patient`/`CRM`/`AuditLog` 등 다른 Entity는 애초에 이원화 대상이 아니었으므로 이 항목과 무관.
+2. **버전 관리 이원화**: Git 커밋(표준, ADR-012)과 파일명 접미사(`_v2`, `_v3`, `_final`, `_new`, 보조 수단)가 병행되어 "이 파일의 진짜 최신 이력"을 확인하려면 두 체계를 모두 봐야 하는 부채는 남아있음 — git 사용 자체가 없다는 서술은 ADR-012로 정정됐으나, 두 체계 공존 자체는 해소되지 않았다.
 3. **JSON 파일 기반 저장**: 동시성은 파일 락으로 처리하나 확장성 한계 존재 (`docs/SQLite_Migration_Plan.md` 참조, 미착수).
 
 이 부채들에 대한 결정 여부는 [DECISIONS.md](DECISIONS.md)와 [ROADMAP.md](ROADMAP.md)에서 관리한다.

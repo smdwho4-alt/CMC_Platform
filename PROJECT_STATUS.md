@@ -2,15 +2,26 @@
 
 > 이 문서는 프로젝트의 **현재 시점 상태 스냅샷**이다. 최신 정보를 유지하는 것이 원칙이며, 상태가 바뀔 때마다 갱신한다.
 
-**최종 갱신**: 2026-07-12 (v1.0.0-pilot 릴리스 반영)
-**버전**: v1.0.0-pilot (릴리스 상세: [RELEASE_REPORT_v1.0.0-pilot_new.md](RELEASE_REPORT_v1.0.0-pilot_new.md), 이전 릴리스: [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md))
-**단계**: Sprint A~I + Sprint 2(Dashboard v3) + DEV-003 완료 → **Architecture Freeze(Sprint 0) 완료** → **구조 Freeze(v0.9.0 기준) 유지** → **Pilot 운영 가능 (조건부 Pilot Ready — 잔여 Follow-up 3건은 §2-1 참조)**
+**최종 갱신**: 2026-07-28 (Sprint 4 Commit 1 — SSOT 문서 정렬 반영)
+**버전**: v1.1.0-beta1 (DEV-004 태그, 2026-07-12) — 이전 릴리스: [RELEASE_REPORT_v1.0.0-pilot_new.md](RELEASE_REPORT_v1.0.0-pilot_new.md), [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md)
+**단계**: Sprint A~I + Sprint 2(Dashboard v3) + DEV-003/DEV-004 완료 → **Architecture Freeze(Sprint 0) 완료** → Single Admin Portal Sprint 1~3(별도 트랙) 완료 → Sprint 3.5(Architecture Review) 완료 → **Sprint 4(Reservation Core Integration) 진행 중 — Commit 0 완료, Commit 1 진행 중**
+**Git Push 상태**: 로컬 커밋이 origin 대비 다수 ahead, 0 behind(§0 참조). **이번 세션 포함 어떤 Sprint 4 작업물도 origin에 push되지 않았다** — push는 PM이 명시적으로 승인한 시점에만 수행한다(ADR-012).
 
 > **Architecture Freeze**와 **Pilot Ready(운영 파일럿 투입 가능 여부)**는 서로 다른 개념으로 별도 관리한다. Architecture Freeze는 설계·구조·표준 문서의 확정이며, 미해결 버그 존재와 무관하게 완료될 수 있다(DECISIONS.md ADR-010). Pilot Ready는 아래 §2의 Known Issues가 모두 해소되어야 충족된다.
 
 > **프로젝트 구조는 v0.9.0 현재 상태로 Freeze되었다.** 구조 변경 작업은 중단하고 Pilot 종료 후 v1.0 작업으로 이관한다(DECISIONS.md ADR-011). 구조 관련 기준 문서는 [docs/STRUCTURE_REORG_ANALYSIS_new.md](docs/STRUCTURE_REORG_ANALYSIS_new.md)이다.
 
-**현재 최우선 작업 순서**: ~~① STEP1.5 DateFix → ② 전체 QA → ③ Pilot Release~~ **완료 (v1.0.0-pilot 태그)** → 다음: Pilot 운영 + Follow-up 3건(§2-1) 해소
+**현재 최우선 작업 순서**: ~~① STEP1.5 DateFix → ② 전체 QA → ③ Pilot Release~~ **완료** → Single Admin Portal Sprint 1~3·Sprint 3.5 **완료** → **Sprint 4(Reservation Core Integration) Commit 1 진행 중** → 다음: Sprint 4 Commit 2(예약 승인) PM 승인 대기
+
+## 0. Git Push / 배포 상태 (Sprint 4 Commit 1에서 신설)
+
+| 항목 | 상태 |
+|---|---|
+| origin 대비 로컬 커밋 | **다수 ahead, 0 behind**(정확한 수치는 `git rev-list --count origin/main..HEAD`로 확인 — 이 문서 갱신 시점 기준 22개, 본 Commit 1 반영 후 23개 예상) |
+| origin 마지막 반영 커밋 | `b390fa1`(2026-07-12, "docs: v1.0.0-pilot 릴리스 문서 갱신") |
+| origin에 아직 없는 것 | `v1.1.0-beta1` 태그(DEV-004, `git ls-remote --tags origin`으로 미존재 확인) 및 그 이후 커밋 전체(Single Admin Portal Sprint 1~3, Sprint 3.5, Sprint 4). `v1.0.0-pilot` 태그는 origin에 이미 존재(push 완료 확인). |
+| 이번 세션의 push 여부 | **push하지 않음.** push는 PM이 명시적으로 승인한 시점에만 수행(ADR-012) |
+| GAS 실배포 상태 | STEP1.5 DateFix는 2026-07-12 실배포 완료(GAS Version 5, §2 참조). **Sprint 4 Commit 0/1은 GAS/FastAPI/Portal 코드를 전혀 변경하지 않았으므로 이번 Sprint 4 진행분에 대한 별도 배포 자체가 아직 발생하지 않았다.** |
 
 ---
 
@@ -29,7 +40,12 @@
 | STEP1.5 DateFix 실배포 | ✅ **완료** — GAS Version 5 재배포 (2026-07-12, 사용자 수행), DEV-003 Live 검증으로 간접 확인 |
 | DEV-003 (관리자 예약관리 Sheets연동) | ✅ **완료** — 구현+테스트 60/60 PASS, Live 검증 완료(조회/상태변경/메모저장/새로고침유지/원복 PASS, 응답 1.765초) |
 | HotFix#1 유실분 복원 (`353b72f`) | ✅ **완료** — cc5803f FUSE 복구 시 회귀했던 dashboard 서비스를 커밋된 HTML과 정합하도록 복원 |
-| v1.0.0-pilot 태그 | ✅ 생성·push 완료 (2026-07-12) |
+| v1.0.0-pilot 태그 | ✅ 생성·push 완료 (2026-07-12, `git ls-remote --tags origin`으로 재확인 — origin에 실재) |
+| DEV-004 (선택검사 Rule 기반 UI) | ✅ **완료** — `v1.1.0-beta1` 태그(2026-07-12) |
+| Single Admin Portal Sprint 1~3(별도 트랙) | ✅ **완료** — RBAC/CRM통합/Audit/AI지원/운영자UX 등 전 Commit, Sprint3_Final_Report_v1.0.md 참조 |
+| Sprint 3.5(Platform Integration Architecture Review) | ✅ **완료** — `Platform_Integration_Architecture_Review_v1.0.md` |
+| **Sprint 4 Commit 0**(문서 Baseline) | ✅ **완료**(2026-07-28) |
+| **Sprint 4 Commit 1**(SSOT 문서 정렬) | 🔄 **진행 중**(본 갱신 자체가 이 Commit의 산출물) |
 
 ---
 
@@ -126,3 +142,6 @@ E. 기능     PASS (금지응답 35/35, 백업·복구 9/9)
 - 릴리스 노트: [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md)
 - Pilot 최종 검토: [PILOT_READINESS_REVIEW.md](PILOT_READINESS_REVIEW.md)
 - 구조 기준 문서(Freeze, v1.0 재검토용): [docs/STRUCTURE_REORG_ANALYSIS_new.md](docs/STRUCTURE_REORG_ANALYSIS_new.md)
+- Sprint 4 Reservation Core 아키텍처: [Reservation_Core_Architecture_v1.0.md](Reservation_Core_Architecture_v1.0.md)
+- Sprint 4 구현 계획(Commit 0~6): [Sprint4_Implementation_Plan_v1.0.md](Sprint4_Implementation_Plan_v1.0.md)
+- Sprint 3.5 통합 아키텍처 리뷰: [Platform_Integration_Architecture_Review_v1.0.md](Platform_Integration_Architecture_Review_v1.0.md)
