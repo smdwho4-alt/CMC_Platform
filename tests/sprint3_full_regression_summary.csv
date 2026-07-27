@@ -1,0 +1,21 @@
+﻿구분,스크립트,결과,비고
+기존 Sprint A(Core Data Layer),run_sprint_a_tests.py,PASS,
+기존 Sprint B(Reservation Engine),run_sprint_b_tests.py,PASS,
+"기존 Sprint D(API Layer, api_server.py 직접 검증)",run_sprint_d_tests.py,PASS,
+기존 Sprint E(AI Agent),run_sprint_e_tests.py,PASS,
+기존 Sprint F(Chat Widget),run_sprint_f_tests.py,PASS,
+기존 Sprint G(Claude 연동),run_sprint_g_tests.py,"FAIL(기존 결함, Sprint1/2/3 무관 확인됨)",Sprint 1 이전부터 존재하던 결함(questionnaires/start 응답 스키마 이슈로 추정). Sprint 1 Commit 4에서 git stash로 api_server.py 변경 무관함을 이미 확인함.
+기존 Sprint H(운영 전환),run_sprint_h_tests.py,PASS,
+기존 Sprint I(품질 게이트),run_sprint_i_quality_gate.py,"FAIL(기존 결함, Sprint1/2/3 무관 확인됨)",스크립트 자체 print()의 Windows cp949 콘솔 인코딩 결함(Sprint 1 Commit 4에서 이미 확인). Sprint 2/3에서 이 파일을 수정하지 않았으므로 동일하게 재발함.
+Sprint 1 Commit 1(조회 계층),run_sprint1_query_layer_qa.py,PASS,
+Sprint 1 Commit 2(관리자 조회 API),run_sprint1_admin_portal_api_qa.py,PASS,
+Sprint 1 Commit 3(Portal 셸),run_sprint1_portal_shell_qa.py,PASS,
+Sprint 2 Commit 1(Dashboard),run_sprint2_dashboard_qa.py,PASS,
+Sprint 2 Commit 2(예약조회 검색/정렬/페이지),run_sprint2_reservation_search_qa.py,PASS,
+Sprint 2 Commit 3(예약상세),run_sprint2_reservation_detail_qa.py,PASS,
+Sprint 2 Commit 4(통계),run_sprint2_statistics_qa.py,PASS,
+Sprint 3 Commit 1(RBAC),run_sprint3_rbac_qa.py,PASS,
+Sprint 3 Commit 2(CRM 통합),run_sprint3_crm_qa.py,PASS,
+Sprint 3 Commit 3(Audit Log 연결),run_sprint3_audit_qa.py,PASS,
+Sprint 3 Commit 4(AI 상담 지원 기반),run_sprint3_ai_support_qa.py,PASS,
+Sprint 3 Commit 5(운영자 UX 개선),run_sprint3_ux_qa.py,PASS,
