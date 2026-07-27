@@ -41,6 +41,7 @@ import core_data_loader as loader  # noqa: E402
 import pii_mask  # noqa: E402
 import reservation_approval_states as approval_states  # noqa: E402
 import reservation_audit as audit  # noqa: E402
+import reservation_engine as engine  # noqa: E402
 import sheets_readonly_service as sheets  # noqa: E402
 import sheets_write_service as sheets_write  # noqa: E402
 from file_lock import DataLock  # noqa: E402
@@ -453,11 +454,53 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
             },
         }
 
+    # ── Sprint 4 Commit 3: Reservation Slot Integration ──
+    # 승인(예약확정)일 때만 Slot을 조회·점유한다(거절은 Slot을 소비하지 않으므로 대상 아님).
+    # 기존 reservation_engine.py의 Slot 갱신/해제 로직(_update_slot/_release_slot)을
+    # 그대로 재사용하며 신규 Slot Engine을 만들지 않는다(PM 재사용 원칙).
+    # Lock→Capacity 검사→Slot 점유→Unlock 순서는 기존 file_lock.py::DataLock으로 보장한다.
+    def _reserve_slot_for_approval(reservation: dict[str, Any], user: dict[str, Any]) -> str:
+        wish_date = reservation.get("wishDate")
+        wish_time = reservation.get("wishTime")
+        with DataLock(data_dir):
+            slots = loader.load_entity("Slot", data_dir)
+            slot = next(
+                (s for s in slots if s.get("date") == wish_date and s.get("time") == wish_time), None,
+            )
+            if slot is None:
+                raise HTTPException(409, {
+                    "code": "SLOT_NOT_AVAILABLE",
+                    "message": f"해당 일시({wish_date} {wish_time})에 생성된 Slot이 없습니다.",
+                })
+            reserved = int(slot.get("reservedCount", 0))
+            capacity = int(slot.get("capacity", 0))
+            if reserved >= capacity:
+                raise HTTPException(409, {
+                    "code": "SLOT_FULL",
+                    "message": f"해당 일시({wish_date} {wish_time})의 예약 정원이 마감되었습니다.",
+                })
+            new_count = reserved + 1
+            full = new_count >= capacity
+            engine._update_slot(data_dir, slot["id"], {  # noqa: SLF001 — 기존 구현 재사용(신규 Engine 금지)
+                "reservedCount": new_count, "status": "FULL" if full else "AVAILABLE",
+            })
+            if full:
+                audit.append_audit(data_dir, "SLOT_FULL", "Slot", slot["id"], user.get("id"),
+                                   after={"status": "FULL", "reservedCount": new_count})
+            return slot["id"]
+
+    def _rollback_slot_reservation(slot_id: str, user: dict[str, Any], reservation_no: str) -> None:
+        # Sheets 쓰기 실패 시 Slot 점유를 되돌린다. 기존 _release_slot이 정원 복구와
+        # SLOT_RELEASED Audit 기록을 함께 수행한다(재사용, 신규 로직 없음).
+        engine._release_slot(  # noqa: SLF001
+            data_dir, slot_id, user.get("id"), was_confirmed=True,
+            note=f"{reservation_no} Sheets 쓰기 실패로 Slot 롤백",
+        )
+
     # ── Sprint 4 Commit 2: 예약 승인/거절(Reservation Approval Foundation) ──
     # 대상은 Google Sheets 예약(SSOT, ADR-013)이며 로컬 JSON 예약(api_server.py의
     # /api/reservations/{rid}/approve 등)은 건드리지 않는다 — URL 네임스페이스가
     # 다르므로(/api/admin/reservations/* vs /api/reservations/*) 충돌 없음.
-    # Slot/정원 검사는 Commit 3 범위이며 이 엔드포인트에 포함하지 않는다.
     def _process_reservation_approval(
         reservation_no: str, target_status: str, user: dict[str, Any], reason: str | None,
     ) -> dict[str, Any]:
@@ -486,22 +529,36 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
                 "이미 처리했거나 승인/거절 대상 상태가 아닙니다.",
             ) from e
 
-        # 3) write — GAS 기존 updateStatus action만 사용(신규 action 없음, GAS 무수정).
+        # 3) Sprint 4 Commit 3 — 승인(예약확정)일 때만 Slot 조회·점유. Google Sheets
+        #    쓰기 전에 Slot 확보가 끝나 있어야 한다(PM 원칙: Slot 확보 → Sheets 쓰기).
+        slot_id: str | None = None
+        if target_status == "예약확정":
+            slot_id = _reserve_slot_for_approval(current, user)
+
+        # 4) write — GAS 기존 updateStatus action만 사용(신규 action 없음, GAS 무수정).
         try:
             sheets_write.update_status(reservation_no, target_status)
         except sheets_write.SheetsIntegrationNotConfigured as e:
+            if slot_id:
+                _rollback_slot_reservation(slot_id, user, reservation_no)
             raise HTTPException(503, str(e)) from e
         except sheets_write.SheetsIntegrationError as e:
-            raise HTTPException(502, str(e)) from e
+            # Sheets 쓰기 실패 시 Slot Rollback(PM 필수 구현 사항).
+            if slot_id:
+                _rollback_slot_reservation(slot_id, user, reservation_no)
+            raise HTTPException(502, {"code": "SHEETS_WRITE_FAILED", "message": str(e)}) from e
 
-        # Audit은 Sheets 상태 변경 성공 이후에만 기록한다(PM Audit 원칙). 기존
-        # reservation_engine.py::approve_reservation()과 동일하게 "쓰기 성공 →
-        # 감사기록" 순서이며, 감사기록 자체가 실패하는 경우의 보상 트랜잭션은
-        # 기존 시스템에도 없으므로 이번 Commit도 동일 정책을 따른다(§12-6).
+        # Audit은 Sheets 상태 변경 성공 이후에만 기록한다(PM Audit 원칙, Commit 2부터
+        # 유지). 기존 reservation_engine.py::approve_reservation()과 동일하게 "쓰기
+        # 성공 → 감사기록" 순서이며, 감사기록 자체가 실패하는 경우의 보상 트랜잭션은
+        # 기존 시스템에도 없으므로(Best Effort) 이번 Commit도 동일 정책을 따른다.
         event = "RESERVATION_APPROVED" if target_status == "예약확정" else "RESERVATION_REJECTED"
+        after: dict[str, Any] = {"status": target_status}
+        if slot_id:
+            after["slotId"] = slot_id
         audit.append_audit(
             data_dir, event, "Reservation", reservation_no, user.get("id"),
-            before={"status": current_status}, after={"status": target_status},
+            before={"status": current_status}, after=after,
             channel="ADMIN_PORTAL", note=reason,
         )
 
@@ -511,6 +568,7 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
                 "reservationNo": reservation_no,
                 "previousStatus": current_status,
                 "status": target_status,
+                "slotId": slot_id,
                 "processedBy": user.get("id"),
                 "processedAt": now_iso(),
             },

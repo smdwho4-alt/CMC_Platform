@@ -1,0 +1,50 @@
+﻿테스트명,결과,상세
+reservation_engine의 _update_slot을 재사용(신규 Slot Engine 없음),PASS,
+reservation_engine의 _release_slot을 재사용(Rollback에 신규 로직 없음),PASS,
+DataLock으로 Lock→Capacity검사→Slot점유 구간을 감쌈(동시성 원칙),PASS,
+신규 승인 API 엔드포인트 추가 없음(기존 approve/reject 2개만 유지),PASS,2
+(1) Slot 존재 + 승인 성공(200),PASS,200
+"(5) Slot 점유 반영(reservedCount 1, capacity 1 → FULL)",PASS,"(1, 'FULL')"
+응답에 slotId 포함,PASS,
+(3) Capacity FULL → 409,PASS,409
+(3) 409 code=SLOT_FULL,PASS,"{'detail': {'code': 'SLOT_FULL', 'message': '해당 일시(2026-08-01 09:00)의 예약 정원이 마감되었습니다.'}}"
+(3) FULL 재시도 후에도 정원 초과 점유 없음(reservedCount 여전히 1),PASS,
+(2) 매칭 Slot 없음 → 409,PASS,409
+(2) 409 code=SLOT_NOT_AVAILABLE,PASS,
+(4) 정원 여유 Slot 승인 성공(1/2),PASS,200
+(4) Slot 상태 AVAILABLE 유지(1/2),PASS,
+"(4) 정원 여유 Slot 승인 성공(2/2, 정원 도달)",PASS,200
+(4) 정원 도달 시 FULL 전환,PASS,
+(7) Sheets 쓰기 실패 → 502,PASS,502
+(7) 502 code=SHEETS_WRITE_FAILED,PASS,
+(6) Sheets 실패 시 Slot이 롤백되어 다시 0/AVAILABLE,PASS,"(0, 'AVAILABLE')"
+(6) SLOT_RELEASED Audit 기록됨(기존 _release_slot의 자체 Audit 재사용),PASS,
+(8) GAS 실패 시 RESERVATION_APPROVED Audit 생성되지 않음,PASS,
+(8) 승인 성공 시 RESERVATION_APPROVED Audit 생성,PASS,1
+(8) Audit.after에 slotId 포함(추적성),PASS,
+(9) DIRECTOR(reservation:approve 미보유) → 403,PASS,403
+(9) 코드에 하드코딩된 역할명(ROLE-) 없이 permission 문자열만 사용,PASS,
+(10) 409는 SLOT_NOT_AVAILABLE/SLOT_FULL 두 코드만 신규 사용(기존 전이충돌 409와 별개),PASS,
+(11) 502는 SHEETS_WRITE_FAILED 코드 사용,PASS,
+(12) 정원 1인 Slot에 순차 요청 시 하나만 성공,PASS,"200, 409"
+(12) 정원 초과 점유 없음(reservedCount == capacity 정확히 유지),PASS,
+거절은 여전히 200(Slot 소비 없음),PASS,200
+"거절 시 Slot 상태 불변(0, AVAILABLE)",PASS,
+GAS(sheets_api_v3_final.gs) 무수정 확인,PASS,
+로컬 JSON 승인 API 소유 파일(api_server.py) 무수정 확인,PASS,
+"reservation_engine.py 무수정 확인(재사용만, 수정 없음)",PASS,
+slot_generator.py 무수정 확인,PASS,
+Slot 통합 코드 블록 추출 성공(진단용),PASS,2171
+대기예약(WAITING) 관련 신규 로직 없음,PASS,
+alternative_slot_recommender(AI 추천 Slot) 호출 없음,PASS,
+Equipment.capacityPerHour 실사용 없음(Commit4 이후 범위),PASS,
+검진유형(기업/영유아/특수건강진단) 정원 로직 없음,PASS,
+(14)/(15) SLOT_NOT_AVAILABLE/SLOT_FULL 코드 분기 존재,PASS,
+_extractDetailMessage 헬퍼로 구조화된 detail(code/message) 처리,PASS,
+"(16) Toast(showToast) 재사용, 신규 알림 시스템 없음",PASS,
+(17) 처리 후 목록 재조회(load) 유지,PASS,
+UI에 신규 탭/버튼(Slot 관리 등) 추가 없음(대폭 변경 금지 준수) — 예약조회 탭 구조만 유지,PASS,
+"[수동 QA] 정원 1인 Slot에 1건 승인 성공 후, 같은 슬롯에 2번째 건 승인 클릭 → '해당 일시(...)의 예약 정원이 마감되었습니다.' 토스트 실제 표시(SLOT_FULL 실재현)",PASS,
+[수동 QA] 매칭 Slot이 없는 시각(23:59)의 건 승인 클릭 → '해당 일시(...)에 생성된 Slot이 없습니다.' 토스트 실제 표시(SLOT_NOT_AVAILABLE 실재현),PASS,
+"[수동 QA] 이미 승인된 건 재승인 클릭 → 기존 Commit2 문구('다른 사용자가 이미 처리했거나...') 그대로 유지, Slot 관련 토스트와 혼동되지 않음(회귀 없음)",PASS,
+[수동 QA] 위 3개 시나리오 전 구간 콘솔 오류 0건,PASS,

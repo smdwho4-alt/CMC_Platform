@@ -21,6 +21,7 @@ GAS 호출부는 monkeypatch — 실네트워크·실Sheets 없음. 샌드박스
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -43,6 +44,22 @@ SANDBOX = Path(__file__).parent / "sandbox_sprint4_commit2_approval" / "data"
 if SANDBOX.parent.exists():
     shutil.rmtree(SANDBOX.parent)
 shutil.copytree(ROOT / "data", SANDBOX)
+
+# Sprint 4 Commit 3(Reservation Slot Integration) 회귀 대응: 승인(예약확정)이 이제
+# Slot 조회·점유를 거치므로, 이 테스트의 승인 성공 케이스들이 매칭될 넉넉한 정원의
+# 더미 Slot을 하나 주입한다(capacity를 크게 잡아 이 파일 내 승인 성공 케이스가
+# 서로 정원을 다투지 않게 함 — Commit 3 자체의 FULL/NOT_AVAILABLE 동작 검증은
+# run_sprint4_commit3_slot_integration_qa.py가 전담한다).
+_DUMMY_SLOT_DATE = "2026-07-28"
+_DUMMY_SLOT_TIME = "09:00"
+_slots_doc = json.loads((SANDBOX / "slots.json").read_text(encoding="utf-8"))
+_slots_doc["records"].append({
+    "id": "SLOT-COMMIT2QA-0900-A", "date": _DUMMY_SLOT_DATE, "time": _DUMMY_SLOT_TIME,
+    "capacity": 50, "reservedCount": 0, "waitingCount": 0, "status": "AVAILABLE",
+    "roomId": "ROOM-0001", "programRestriction": None, "note": "Sprint4 Commit2 QA 더미(Commit3 회귀 대응)",
+    "createdAt": "2026-07-28T00:00:00+09:00", "updatedAt": "2026-07-28T00:00:00+09:00",
+})
+(SANDBOX / "slots.json").write_text(json.dumps(_slots_doc, ensure_ascii=False, indent=2), encoding="utf-8")
 
 results: list[tuple[str, str, str]] = []
 
@@ -82,7 +99,9 @@ _FAKE_DB: dict[str, dict] = {}
 
 
 def _reset_fake_reservation(no: str, status: str) -> None:
-    _FAKE_DB[no] = {"reservationNo": no, "status": status, "name": "QA더미"}
+    # wishDate/wishTime은 위에서 주입한 넉넉한 정원의 더미 Slot과 매칭된다(Commit 3 대응).
+    _FAKE_DB[no] = {"reservationNo": no, "status": status, "name": "QA더미",
+                     "wishDate": _DUMMY_SLOT_DATE, "wishTime": _DUMMY_SLOT_TIME}
 
 
 def _fake_get_reservation(no, **kw):
@@ -207,9 +226,11 @@ if recs:
     check("(10) Audit action=RESERVATION_REJECTED", rec.get("action") == "RESERVATION_REJECTED")
     check("(10) 거절 사유가 Audit note에 기록됨", rec.get("note") == "정원 초과로 거절")
 
-# 거절 사유가 Sheets(Fake)에는 저장되지 않는지 확인(PM 결정 2)
+# 거절 사유가 Sheets(Fake)에는 저장되지 않는지 확인(PM 결정 2). wishDate/wishTime은
+# Commit 3 Slot 매칭용으로 _reset_fake_reservation이 채우는 필드라 원래부터 존재하며
+# "거절 사유가 별도로 추가되지 않았는가"와는 무관하므로 기준 집합에 포함한다.
 check("(2) 거절 사유는 Sheets 쪽 Fake 레코드에 별도 필드로 남지 않음(status만 변경)",
-      set(_FAKE_DB["20260728-1011"].keys()) == {"reservationNo", "status", "name"})
+      set(_FAKE_DB["20260728-1011"].keys()) == {"reservationNo", "status", "name", "wishDate", "wishTime"})
 
 
 # 13) 기존 로컬 JSON 승인 API 회귀(api_server.py의 /api/reservations/{rid}/approve — 무수정 확인)
