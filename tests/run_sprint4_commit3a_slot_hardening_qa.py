@@ -132,8 +132,13 @@ def _slot(slot_id: str) -> dict:
 _FAKE_DB: dict[str, dict] = {}
 
 
-def _reset_reservation(no: str, date: str, time: str, status: str = "예약접수") -> None:
-    _FAKE_DB[no] = {"reservationNo": no, "status": status, "wishDate": date, "wishTime": time, "name": "QA더미"}
+def _reset_reservation(no: str, date: str, time: str, status: str = "예약접수", program: str = "BASIC") -> None:
+    # program은 Commit 5-2(Approval Pipeline Policy Integration)의 Program Mapping
+    # 선행 검사(resolve_program()) 대응 — "BASIC"은 Program.code와 완전일치하는
+    # 실제 값(data/programs.json). 이 파일의 더미 Slot은 programRestriction=None이라
+    # 어떤 유효 프로그램을 넣어도 이후 상태/Capacity/중복 검증에는 영향 없다.
+    _FAKE_DB[no] = {"reservationNo": no, "status": status, "wishDate": date, "wishTime": time,
+                     "name": "QA더미", "program": program}
 
 
 def _fake_get(no, **kw):
@@ -165,6 +170,16 @@ _reset_reservation("20260805-0001", "2026-08-05", "09:00")
 r = _approve("20260805-0001")
 check("(1)/(2) AVAILABLE Slot 승인 성공(200) — Repository에 'OPEN' 상태 없어 AVAILABLE로 대체 검증",
       r.status_code == 200, str(r.status_code))
+
+# Sprint 4 Commit 5-2A(PM 리뷰 반영, Policy Layer / Execution Layer 분리): validate_slot()은
+# Policy Layer(휴진일/의사·간호사 근무/검사실/장비/운영시간/프로그램 제한)만 담당하고
+# Slot 자체 status/Capacity/중복점유 같은 Execution Layer 판정은 대체하지 않는다.
+# routes_admin_portal.py가 validate_slot()의 FULL/HOLD/WAITING/DUPLICATED 판정과,
+# BLOCKED인데 Slot 자체 status=="BLOCKED"인 경우, INVALID인데 프로그램 제한이 원인이
+# 아닌 경우(=Slot status가 미확정 값)를 명시적으로 걸러내 차단하지 않고 그대로 통과시켜
+# 아래 기존 Commit3A 로직이 최종 코드를 생성하도록 위임한다. 따라서 이 파일이 원래
+# 검증하던 SLOT_FULL/SLOT_BLOCKED/SLOT_ON_HOLD/SLOT_NOT_AVAILABLE/SLOT_INVALID_STATE는
+# 예전과 동일하게 그대로 도달한다.
 
 # (3) FULL → 409 SLOT_FULL(상태값 자체가 FULL인 경우)
 _reset_reservation("20260805-0002", "2026-08-05", "10:30")

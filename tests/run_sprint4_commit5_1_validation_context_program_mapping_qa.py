@@ -146,16 +146,22 @@ check("create_reservation_request() 내부의 validate_slot() 호출에 validati
 check("change_reservation() 내부의 validate_slot() 호출에 validation_context 인자 없음(기존 동작 불변)",
       "v = validate_slot(new_slot_id, rec[\"patientId\"], new_date, data_dir," in _SRC)
 
-# ── 8. 이번 Commit 절대 금지 사항 정적 재확인 ──
+# ── 8. Commit5-1 당시 절대 금지 사항 — Commit 5-2에서 PM 승인 하에 연동됨(이력 보존) ──
+# 이 파일 최초 작성 시점(Commit 5-1)에는 이 4개 항목이 routes_admin_portal.py에
+# "존재하지 않아야" 했다(Approval Pipeline 연동은 별도 Commit으로 분리). 이후
+# Sprint4 Commit5-2(Approval Pipeline Policy Integration, PM 승인)에서 정확히 이
+# 4가지를 연동하는 것이 그 Commit의 승인된 목표였으므로, 아래 4개 체크는 "없어야
+# 한다"에서 "Commit5-2 이후 존재해야 한다"로 뒤집혔다 — 이 파일이 계속 재사용되는
+# 회귀 스위트이므로 최신 승인 상태를 반영한다(과거 시점의 의미는 이 주석으로 보존).
 _ROUTES_SRC = (ROOT / "src" / "api" / "routes_admin_portal.py").read_text(encoding="utf-8")
-check("routes_admin_portal.py(Approval Pipeline)에 validation_context 참조 없음(연동 금지 준수)",
-      "validation_context" not in _ROUTES_SRC)
-check("routes_admin_portal.py에 resolve_program 참조 없음(연동 금지 준수)",
-      "resolve_program" not in _ROUTES_SRC)
-check("routes_admin_portal.py에 RESERVATION_PROGRAM_UNMAPPED 코드 없음(이번 Commit 범위 아님)",
-      "RESERVATION_PROGRAM_UNMAPPED" not in _ROUTES_SRC)
-check("routes_admin_portal.py에 SLOT_POLICY_VALIDATION_FAILED 코드 없음(이번 Commit 범위 아님)",
-      "SLOT_POLICY_VALIDATION_FAILED" not in _ROUTES_SRC)
+check("routes_admin_portal.py(Approval Pipeline)에 validation_context 연동됨(Commit5-2, PM 승인)",
+      "validation_context" in _ROUTES_SRC)
+check("routes_admin_portal.py에 resolve_program 연동됨(Commit5-2, PM 승인)",
+      "resolve_program" in _ROUTES_SRC)
+check("routes_admin_portal.py에 RESERVATION_PROGRAM_UNMAPPED 코드 존재(Commit5-2, PM 승인)",
+      "RESERVATION_PROGRAM_UNMAPPED" in _ROUTES_SRC)
+check("routes_admin_portal.py에 SLOT_POLICY_VALIDATION_FAILED 코드 존재(Commit5-2, PM 승인)",
+      "SLOT_POLICY_VALIDATION_FAILED" in _ROUTES_SRC)
 
 # ── 결과 저장 ──
 out = Path(__file__).parent / "sprint4_commit5_1_validation_context_program_mapping_test_result.csv"

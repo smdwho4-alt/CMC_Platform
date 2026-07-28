@@ -51,11 +51,11 @@ shutil.copytree(ROOT / "data", SANDBOX)
 
 # 테스트 전용 더미 Slot 2개 주입(capacity=1로 좁혀 FULL 시나리오를 쉽게 재현) — PII 없음.
 _TEST_SLOTS = [
-    {"id": "SLOT-QA-0900-A", "date": "2026-08-01", "time": "09:00",
+    {"id": "SLOT-QA-0900-A", "date": "2026-08-04", "time": "09:00",
      "capacity": 1, "reservedCount": 0, "waitingCount": 0, "status": "AVAILABLE",
      "roomId": "ROOM-0001", "programRestriction": None, "note": "Sprint4 Commit3 QA 더미",
      "createdAt": "2026-07-28T00:00:00+09:00", "updatedAt": "2026-07-28T00:00:00+09:00"},
-    {"id": "SLOT-QA-1000-A", "date": "2026-08-01", "time": "10:00",
+    {"id": "SLOT-QA-1000-A", "date": "2026-08-04", "time": "10:00",
      "capacity": 2, "reservedCount": 0, "waitingCount": 0, "status": "AVAILABLE",
      "roomId": "ROOM-0001", "programRestriction": None, "note": "Sprint4 Commit3 QA 더미",
      "createdAt": "2026-07-28T00:00:00+09:00", "updatedAt": "2026-07-28T00:00:00+09:00"},
@@ -108,8 +108,13 @@ DIRECTOR = {"X-User-Id": "USR-0001"}  # 미보유
 _FAKE_DB: dict[str, dict] = {}
 
 
-def _reset_reservation(no: str, status: str, date: str, time: str) -> None:
-    _FAKE_DB[no] = {"reservationNo": no, "status": status, "wishDate": date, "wishTime": time, "name": "QA더미"}
+def _reset_reservation(no: str, status: str, date: str, time: str, program: str = "BASIC") -> None:
+    # program은 Commit 5-2(Approval Pipeline Policy Integration)의 Program Mapping
+    # 선행 검사(resolve_program()) 대응 — "BASIC"은 Program.code와 완전일치하는
+    # 실제 값(data/programs.json). 이 파일의 더미 Slot은 programRestriction=None이라
+    # 어떤 유효 프로그램을 넣어도 이후 상태/Capacity/중복 검증에는 영향 없다.
+    _FAKE_DB[no] = {"reservationNo": no, "status": status, "wishDate": date, "wishTime": time,
+                     "name": "QA더미", "program": program}
 
 
 def _fake_get_reservation(no, **kw):
@@ -136,16 +141,19 @@ def _audit_recs(entity_id: str) -> list[dict]:
 # (1) Slot 존재(정상 매칭) + (5) Slot Reserve
 _reset_slots()
 sheets_write.update_status = _fake_update_status_ok
-_reset_reservation("20260801-0001", "예약접수", "2026-08-01", "09:00")
-r = client.post("/api/admin/reservations/20260801-0001/approve", headers=STAFF)
+_reset_reservation("20260804-0001", "예약접수", "2026-08-04", "09:00")
+r = client.post("/api/admin/reservations/20260804-0001/approve", headers=STAFF)
 check("(1) Slot 존재 + 승인 성공(200)", r.status_code == 200, str(r.status_code))
 check("(5) Slot 점유 반영(reservedCount 1, capacity 1 → FULL)",
       _slot_state("SLOT-QA-0900-A") == (1, "FULL"), str(_slot_state("SLOT-QA-0900-A")))
 check("응답에 slotId 포함", r.json().get("data", {}).get("slotId") == "SLOT-QA-0900-A")
 
 # (3) Capacity FULL
-_reset_reservation("20260801-0002", "예약접수", "2026-08-01", "09:00")
-r = client.post("/api/admin/reservations/20260801-0002/approve", headers=STAFF)
+# Sprint 4 Commit 5-2A(PM 리뷰 반영): validate_slot()의 FULL 판정은 Execution Layer로
+# 분류되어 routes_admin_portal.py가 차단하지 않고 그대로 통과시킨다 — 아래 기존
+# Commit3A 로직이 이 시나리오의 최종 코드(SLOT_FULL)를 그대로 생성한다.
+_reset_reservation("20260804-0002", "예약접수", "2026-08-04", "09:00")
+r = client.post("/api/admin/reservations/20260804-0002/approve", headers=STAFF)
 check("(3) Capacity FULL → 409", r.status_code == 409, str(r.status_code))
 body = r.json()
 check("(3) 409 code=SLOT_FULL", body.get("detail", {}).get("code") == "SLOT_FULL", str(body))
@@ -153,27 +161,27 @@ check("(3) FULL 재시도 후에도 정원 초과 점유 없음(reservedCount �
       _slot_state("SLOT-QA-0900-A")[0] == 1)
 
 # (2) Slot 없음
-_reset_reservation("20260801-0003", "예약접수", "2026-08-01", "23:45")
-r = client.post("/api/admin/reservations/20260801-0003/approve", headers=STAFF)
+_reset_reservation("20260804-0003", "예약접수", "2026-08-04", "23:45")
+r = client.post("/api/admin/reservations/20260804-0003/approve", headers=STAFF)
 check("(2) 매칭 Slot 없음 → 409", r.status_code == 409, str(r.status_code))
 check("(2) 409 code=SLOT_NOT_AVAILABLE", r.json().get("detail", {}).get("code") == "SLOT_NOT_AVAILABLE")
 
 # (4) Capacity Available(정원 2인 Slot, 2건 연속 승인 성공)
-_reset_reservation("20260801-0004", "예약접수", "2026-08-01", "10:00")
-r = client.post("/api/admin/reservations/20260801-0004/approve", headers=STAFF)
+_reset_reservation("20260804-0004", "예약접수", "2026-08-04", "10:00")
+r = client.post("/api/admin/reservations/20260804-0004/approve", headers=STAFF)
 check("(4) 정원 여유 Slot 승인 성공(1/2)", r.status_code == 200, str(r.status_code))
 check("(4) Slot 상태 AVAILABLE 유지(1/2)", _slot_state("SLOT-QA-1000-A") == (1, "AVAILABLE"))
-_reset_reservation("20260801-0005", "예약접수", "2026-08-01", "10:00")
-r = client.post("/api/admin/reservations/20260801-0005/approve", headers=STAFF)
+_reset_reservation("20260804-0005", "예약접수", "2026-08-04", "10:00")
+r = client.post("/api/admin/reservations/20260804-0005/approve", headers=STAFF)
 check("(4) 정원 여유 Slot 승인 성공(2/2, 정원 도달)", r.status_code == 200, str(r.status_code))
 check("(4) 정원 도달 시 FULL 전환", _slot_state("SLOT-QA-1000-A") == (2, "FULL"))
 
 # (6) Rollback + (7) Sheets 실패
 _reset_slots()  # SLOT-QA-0900-A: capacity 1, reservedCount 0으로 초기화
 sheets_write.update_status = _fake_update_status_fail
-_reset_reservation("20260801-0006", "예약접수", "2026-08-01", "09:00")
-before = _audit_recs("20260801-0006")
-r = client.post("/api/admin/reservations/20260801-0006/approve", headers=STAFF)
+_reset_reservation("20260804-0006", "예약접수", "2026-08-04", "09:00")
+before = _audit_recs("20260804-0006")
+r = client.post("/api/admin/reservations/20260804-0006/approve", headers=STAFF)
 check("(7) Sheets 쓰기 실패 → 502", r.status_code == 502, str(r.status_code))
 check("(7) 502 code=SHEETS_WRITE_FAILED", r.json().get("detail", {}).get("code") == "SHEETS_WRITE_FAILED")
 check("(6) Sheets 실패 시 Slot이 롤백되어 다시 0/AVAILABLE",
@@ -182,23 +190,23 @@ slot_audit = [a for a in _audit_recs("SLOT-QA-0900-A") if a.get("action") == "SL
 check("(6) SLOT_RELEASED Audit 기록됨(기존 _release_slot의 자체 Audit 재사용)", len(slot_audit) >= 1)
 
 # (8) Audit — 실패 시 예약 승인 Audit(RESERVATION_APPROVED) 미생성 확인
-after = _audit_recs("20260801-0006")
+after = _audit_recs("20260804-0006")
 check("(8) GAS 실패 시 RESERVATION_APPROVED Audit 생성되지 않음",
       not any(a.get("action") == "RESERVATION_APPROVED" for a in after))
 
 # 성공 케이스 Audit 확인(슬롯 점유 정보 포함)
 sheets_write.update_status = _fake_update_status_ok
 _reset_slots()
-_reset_reservation("20260801-0007", "예약접수", "2026-08-01", "09:00")
-client.post("/api/admin/reservations/20260801-0007/approve", headers=STAFF)
-recs = [a for a in _audit_recs("20260801-0007") if a.get("action") == "RESERVATION_APPROVED"]
+_reset_reservation("20260804-0007", "예약접수", "2026-08-04", "09:00")
+client.post("/api/admin/reservations/20260804-0007/approve", headers=STAFF)
+recs = [a for a in _audit_recs("20260804-0007") if a.get("action") == "RESERVATION_APPROVED"]
 check("(8) 승인 성공 시 RESERVATION_APPROVED Audit 생성", len(recs) == 1, str(len(recs)))
 if recs:
     check("(8) Audit.after에 slotId 포함(추적성)", recs[0].get("after", {}).get("slotId") == "SLOT-QA-0900-A")
 
 # (9) RBAC — 기존 reservation:approve 재사용 확인(신규 권한 문자열 없음)
-_reset_reservation("20260801-0008", "예약접수", "2026-08-01", "10:00")
-r = client.post("/api/admin/reservations/20260801-0008/approve", headers=DIRECTOR)
+_reset_reservation("20260804-0008", "예약접수", "2026-08-04", "10:00")
+r = client.post("/api/admin/reservations/20260804-0008/approve", headers=DIRECTOR)
 check("(9) DIRECTOR(reservation:approve 미보유) → 403", r.status_code == 403, str(r.status_code))
 check("(9) 코드에 하드코딩된 역할명(ROLE-) 없이 permission 문자열만 사용",
       "roleId ==" not in _ROUTES_SRC.split("_reserve_slot_for_approval")[1].split("def _process_reservation_approval")[0])
@@ -216,10 +224,10 @@ check("(11) 502는 SHEETS_WRITE_FAILED 코드 사용", '"code": "SHEETS_WRITE_FA
 #      직렬화되므로, 두 번째 요청이 항상 첫 번째 이후 상태를 보고 정확히 FULL을 반환하는지로 검증)
 _reset_slots()
 sheets_write.update_status = _fake_update_status_ok
-_reset_reservation("20260801-0009", "예약접수", "2026-08-01", "09:00")
-_reset_reservation("20260801-0010", "예약접수", "2026-08-01", "09:00")
-r1 = client.post("/api/admin/reservations/20260801-0009/approve", headers=STAFF)
-r2 = client.post("/api/admin/reservations/20260801-0010/approve", headers=STAFF)
+_reset_reservation("20260804-0009", "예약접수", "2026-08-04", "09:00")
+_reset_reservation("20260804-0010", "예약접수", "2026-08-04", "09:00")
+r1 = client.post("/api/admin/reservations/20260804-0009/approve", headers=STAFF)
+r2 = client.post("/api/admin/reservations/20260804-0010/approve", headers=STAFF)
 check("(12) 정원 1인 Slot에 순차 요청 시 하나만 성공", r1.status_code == 200 and r2.status_code == 409,
       f"{r1.status_code}, {r2.status_code}")
 check("(12) 정원 초과 점유 없음(reservedCount == capacity 정확히 유지)",
@@ -227,8 +235,8 @@ check("(12) 정원 초과 점유 없음(reservedCount == capacity 정확히 유�
 
 # 거절(reject)은 Slot을 소비하지 않음 — 회귀 확인
 _reset_slots()
-_reset_reservation("20260801-0011", "예약접수", "2026-08-01", "09:00")
-r = client.post("/api/admin/reservations/20260801-0011/reject", headers=STAFF, json={"reason": "정원 초과"})
+_reset_reservation("20260804-0011", "예약접수", "2026-08-04", "09:00")
+r = client.post("/api/admin/reservations/20260804-0011/reject", headers=STAFF, json={"reason": "정원 초과"})
 check("거절은 여전히 200(Slot 소비 없음)", r.status_code == 200, str(r.status_code))
 check("거절 시 Slot 상태 불변(0, AVAILABLE)", _slot_state("SLOT-QA-0900-A") == (0, "AVAILABLE"))
 
@@ -248,7 +256,12 @@ _slot_block_start = _ROUTES_SRC.find("_reserve_slot_for_approval")
 _slot_block_end = _ROUTES_SRC.find("def _process_reservation_approval")
 _SLOT_BLOCK = _ROUTES_SRC[_slot_block_start:_slot_block_end] if 0 <= _slot_block_start < _slot_block_end else ""
 check("Slot 통합 코드 블록 추출 성공(진단용)", bool(_SLOT_BLOCK), str(len(_SLOT_BLOCK)))
-check("대기예약(WAITING) 관련 신규 로직 없음", "WAITING" not in _SLOT_BLOCK)
+# Sprint 4 Commit 5-2: validate_slot()의 기존 verdict 집합(AVAILABLE 외 6종)을 정책
+# 차단 코드로 매핑하는 _POLICY_BLOCKED_VERDICTS에 WAITING 문자열이 등장하지만, 이는
+# validate_slot()이 이미 갖고 있던 verdict를 나열만 한 것이지 대기 순번/큐 등 신규
+# 대기예약 비즈니스 로직이 아니다 — 그 부분만 정밀하게 재확인한다(원래 이 체크의 취지).
+check("대기예약(WAITING) 전용 신규 비즈니스 로직 없음(대기 순번/큐 로직 없음, Commit5-2는 기존 verdict를 코드로 매핑만 함)",
+      "waitingCount" not in _SLOT_BLOCK and "대기 순번" not in _SLOT_BLOCK and "WAITING_QUEUE" not in _SLOT_BLOCK)
 check("alternative_slot_recommender(AI 추천 Slot) 호출 없음", "alternative_slot_recommender" not in _ROUTES_SRC
       and "recommend_alternative_slots" not in _ROUTES_SRC)
 check("Equipment.capacityPerHour 실사용 없음(Commit4 이후 범위)", "capacityPerHour" not in _ROUTES_SRC)

@@ -34,8 +34,8 @@ GAS(sheets_api_v3_final.gs) 무수정 확인,PASS,
 로컬 JSON 승인 API 소유 파일(api_server.py) 무수정 확인,PASS,
 "reservation_engine.py 무수정 확인(재사용만, 수정 없음)",PASS,
 slot_generator.py 무수정 확인,PASS,
-Slot 통합 코드 블록 추출 성공(진단용),PASS,4854
-대기예약(WAITING) 관련 신규 로직 없음,PASS,
+Slot 통합 코드 블록 추출 성공(진단용),PASS,9266
+"대기예약(WAITING) 전용 신규 비즈니스 로직 없음(대기 순번/큐 로직 없음, Commit5-2는 기존 verdict를 코드로 매핑만 함)",PASS,
 alternative_slot_recommender(AI 추천 Slot) 호출 없음,PASS,
 Equipment.capacityPerHour 실사용 없음(Commit4 이후 범위),PASS,
 검진유형(기업/영유아/특수건강진단) 정원 로직 없음,PASS,

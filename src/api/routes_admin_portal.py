@@ -488,10 +488,43 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
         # 기존 API 오류 응답 구조({code, message})를 그대로 재사용한다(신규 포맷 없음).
         return HTTPException(409, {"code": code, "message": _SLOT_MESSAGES[code]})
 
+    # ── Sprint 4 Commit 5-2: Approval Pipeline Policy Integration ──
+    # Commit 5-1에서 만든 validation_context/resolve_program()을 승인 Pipeline에
+    # 실제로 연결한다. 신규 Policy Engine/Repository/Service Layer를 만들지 않고
+    # 기존 engine.resolve_program()/engine.validate_slot()만 호출한다(PM 재사용 원칙).
+    # Program Mapping 실패/정책 차단/Unknown Verdict/Exception 4가지 실패 경로는 전부
+    # Slot Reserve 이전에 raise되므로, 기존 Slot Reserve/Sheets Write/Audit/Rollback
+    # 로직(Commit2/3/3A)에는 어떤 코드도 손대지 않는다 — 아래에서 새로 추가되는
+    # 코드는 기존 "상태 확인" 이전에 삽입되는 블록 하나뿐이다.
+    # Sprint 4 Commit 5-2A(PM 리뷰 반영): validate_slot()은 Policy Layer만 담당하고
+    # Execution Layer(Slot 자체 status/Capacity/중복점유 — Commit3A가 이미 소유)를
+    # 대체하지 않는다. validate_slot()은 Sprint B 때부터 FULL/HOLD/WAITING/DUPLICATED
+    # 판정과 Capacity 판정을 자체적으로 갖고 있는데, 이 4개 verdict는 전부 Slot의
+    # status/capacity 필드만 근거로 하며 Commit3A의 _SLOT_ALLOWED_STATUSES/Capacity
+    # 검사와 동일한 데이터를 본다 — 그래서 이 4개는 여기서 차단하지 않고 그대로
+    # 통과시켜 아래 기존 Commit3A 로직이 최종 판정·코드(SLOT_FULL/SLOT_ON_HOLD/
+    # SLOT_INVALID_STATE 등)를 생성하도록 위임한다.
+    # BLOCKED verdict는 두 가지 경로에서 나올 수 있어 모호하다: (a) Slot 자체
+    # status=="BLOCKED"(Execution Layer, Commit3A의 SLOT_BLOCKED와 동일 근거) —
+    # 위임한다. (b) 휴진일/의사·간호사 근무불가/검사실 운영불가/장비 사용불가/운영시간
+    # 외(Policy Layer, Commit3A는 전혀 알지 못하는 영역) — 여기서 차단해야만 한다
+    # (그러지 않으면 의사가 없는 날에도 승인이 나가는 실제 버그가 된다). 이미 위에서
+    # 조회해 둔 slot 변수의 실제 status 값으로 두 경우를 구분한다(reservation_engine.py
+    # 재수정 없이, routes 레이어에서만 판단).
+    _EXECUTION_LAYER_VERDICTS = {"FULL", "HOLD", "WAITING", "DUPLICATED"}
+
+    def _server_log(event: str, **fields: Any) -> None:
+        # PM §12: reservation_no/slot_id/program/오류코드만 남긴다. 환자명·전화번호·
+        # 주민번호 등 개인정보는 절대 남기지 않는다. 새 로깅 시스템은 도입하지 않는다
+        # (Commit 3A에서 확인한 기존 관례 — 이 코드베이스에 logging 모듈 사용례가 없음).
+        parts = " ".join(f"{k}={v}" for k, v in fields.items())
+        print(f"[POLICY][{event}] {parts}", file=sys.stderr)
+
     def _reserve_slot_for_approval(reservation: dict[str, Any], user: dict[str, Any]) -> str:
         wish_date = reservation.get("wishDate")
         wish_time = reservation.get("wishTime")
         reservation_no = reservation.get("reservationNo")
+        program_input = reservation.get("program")
         with DataLock(data_dir):
             # Lock 내부에서 최신 Slot 목록을 재조회한다(PM §6 — Lock 이전에 읽은 값을
             # 신뢰하지 않는다). 이 함수 호출 전에는 Slot을 조회하지 않는다.
@@ -502,6 +535,83 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
             )
             if slot is None:
                 raise _slot_error("SLOT_NOT_AVAILABLE")
+
+            # Program Mapping(PM §4) — resolve_program()만 재사용, Fuzzy/부분일치 없음.
+            # 실패 시 Slot Reserve/Sheets Write/Audit 없이 422로 즉시 차단, Server Log만 기록.
+            program = engine.resolve_program(program_input, data_dir)
+            if program is None:
+                _server_log("RESERVATION_PROGRAM_UNMAPPED", reservation_no=reservation_no,
+                            slot_id=slot.get("id"), program=program_input)
+                raise HTTPException(422, {
+                    "code": "RESERVATION_PROGRAM_UNMAPPED",
+                    "message": "예약의 검진 프로그램을 확인할 수 없어 승인을 진행할 수 없습니다. 관리자에게 문의해 주세요.",
+                })
+
+            # Validation Context(PM §5) — Sheets 예약은 구조적으로 환자 식별자가 없으므로
+            # validation_context="reservation_approval"로 PATIENT_DUPLICATE 검사만
+            # 명시적으로 제외한다(Commit 5-1에서 확정한 정책). patient_id=None은 이
+            # 컨텍스트가 그 검사를 이미 비활성화했기 때문에 전달되는 값이며, None 자체가
+            # 우회 메커니즘으로 쓰이지 않는다(PM이 금지한 암묵적 우회와는 다른 경우).
+            try:
+                policy = engine.validate_slot(
+                    slot["id"], None, wish_date, data_dir, program["id"],
+                    exclude_reservation_id=None, validation_context="reservation_approval",
+                )
+            except Exception as exc:  # noqa: BLE001 — PM §7: validate_slot() 예외 → 500(정책 검증 실패)
+                _server_log("SLOT_POLICY_VALIDATION_FAILED", reservation_no=reservation_no,
+                            slot_id=slot.get("id"), program=program_input, error=str(exc))
+                raise HTTPException(500, {
+                    "code": "SLOT_POLICY_VALIDATION_FAILED",
+                    "message": "예약 정책 검증 중 오류가 발생했습니다. 관리자에게 문의해 주세요.",
+                }) from exc
+
+            # INVALID도 BLOCKED와 마찬가지로 두 경로에서 나올 수 있다: (a) 프로그램 제한
+            # 슬롯 불일치(validate_slot()의 최상단 체크, Commit3A는 전혀 모르는 영역 —
+            # Policy Layer) (b) Slot status가 AVAILABLE/FULL/BLOCKED/HOLD/WAITING/
+            # DUPLICATED 중 어느 것도 아닌 미확정 값(CLOSED/빈 문자열/null/알 수 없는 값)에
+            # 대한 validate_slot()의 catch-all(Commit3A의 _SLOT_ALLOWED_STATUSES fallback과
+            # 동일 근거, Execution Layer). validate_slot()의 프로그램 제한 체크는 이 파이프
+            # 라인에서 결정적으로 재현 가능하므로(동일 slot/program 데이터), 그 조건을 그대로
+            # 재확인해 두 경로를 구분한다(reservation_engine.py 재수정 없이 routes 레이어에서만
+            # 판단).
+            program_restricted_mismatch = bool(
+                slot.get("programRestriction") and program.get("id")
+                and slot["programRestriction"] != program["id"]
+            )
+
+            verdict = policy.get("verdict") if isinstance(policy, dict) else None
+            if verdict == "AVAILABLE":
+                pass  # 계속 진행 — 아래 기존 Slot 상태검사로
+            elif (
+                verdict in _EXECUTION_LAYER_VERDICTS
+                or (verdict == "BLOCKED" and slot.get("status") == "BLOCKED")
+                or (verdict == "INVALID" and not program_restricted_mismatch)
+            ):
+                # Execution Layer 영역(Commit5-2A) — Slot 자체 status/Capacity 근거이므로
+                # 여기서 차단하지 않는다. 아래 기존 Commit3A 로직이 동일 데이터를 다시 보고
+                # 최종 코드(SLOT_FULL/SLOT_BLOCKED/SLOT_ON_HOLD/SLOT_INVALID_STATE 등)를
+                # 생성한다 — validate_slot()의 이 판정은 여기서 그대로 버려진다(재사용 아님,
+                # 이중 판정 방지를 위해 의도적으로 무시).
+                pass
+            elif verdict in {"BLOCKED", "INVALID"}:
+                # 진짜 Policy Layer 차단만 여기서 처리한다: BLOCKED인데 Slot 자체 status는
+                # BLOCKED가 아닌 경우(휴진일/의사·간호사 근무불가/검사실 운영불가/장비 사용
+                # 불가/운영시간 외) 또는 INVALID인데 프로그램 제한 슬롯 불일치가 실제 원인인
+                # 경우. Commit3A는 이 영역을 전혀 모르므로 여기서 차단하지 않으면 정책 위반
+                # 승인이 나갈 수 있다.
+                raise HTTPException(409, {
+                    "code": "RESERVATION_POLICY_BLOCKED",
+                    "message": "예약 정책 검증에 의해 이 예약을 확정할 수 없습니다.",
+                })
+            else:
+                # Unknown Verdict(PM §8) — validate_slot() 정의에 없는 값/반환 구조 이상/
+                # verdict 누락 등. 정의된 INVALID는 여기 해당하지 않는다(위에서 이미 처리).
+                _server_log("POLICY_UNKNOWN_VERDICT", reservation_no=reservation_no,
+                            slot_id=slot.get("id"), program=program_input, verdict=str(verdict))
+                raise HTTPException(500, {
+                    "code": "SLOT_POLICY_VALIDATION_FAILED",
+                    "message": "예약 정책 검증 결과를 확인할 수 없습니다. 관리자에게 문의해 주세요.",
+                })
 
             # 검증 순서(PM §4): 존재 확인 → 상태 확인 → Capacity 확인 → 중복 점유 확인.
             status = slot.get("status")

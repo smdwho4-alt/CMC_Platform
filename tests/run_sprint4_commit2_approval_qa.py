@@ -98,9 +98,13 @@ CRM_USER = {"X-User-Id": "USR-0003"}   # ROLE-CRM: reservation:approve 미보유
 _FAKE_DB: dict[str, dict] = {}
 
 
-def _reset_fake_reservation(no: str, status: str) -> None:
+def _reset_fake_reservation(no: str, status: str, program: str = "BASIC") -> None:
     # wishDate/wishTime은 위에서 주입한 넉넉한 정원의 더미 Slot과 매칭된다(Commit 3 대응).
-    _FAKE_DB[no] = {"reservationNo": no, "status": status, "name": "QA더미",
+    # program은 Commit 5-2(Approval Pipeline Policy Integration)에서 추가된 Program
+    # Mapping 선행 검사(resolve_program()) 대응 — 기본값 "BASIC"은 Program.code와
+    # 완전일치하는 실제 값이다(data/programs.json 확인). 더미 Slot의 programRestriction이
+    # None이므로 어떤 유효 프로그램을 넣어도 이후 검증에 영향 없다.
+    _FAKE_DB[no] = {"reservationNo": no, "status": status, "name": "QA더미", "program": program,
                      "wishDate": _DUMMY_SLOT_DATE, "wishTime": _DUMMY_SLOT_TIME}
 
 
@@ -230,7 +234,8 @@ if recs:
 # Commit 3 Slot 매칭용으로 _reset_fake_reservation이 채우는 필드라 원래부터 존재하며
 # "거절 사유가 별도로 추가되지 않았는가"와는 무관하므로 기준 집합에 포함한다.
 check("(2) 거절 사유는 Sheets 쪽 Fake 레코드에 별도 필드로 남지 않음(status만 변경)",
-      set(_FAKE_DB["20260728-1011"].keys()) == {"reservationNo", "status", "name", "wishDate", "wishTime"})
+      set(_FAKE_DB["20260728-1011"].keys())
+      == {"reservationNo", "status", "name", "wishDate", "wishTime", "program"})
 
 
 # 13) 기존 로컬 JSON 승인 API 회귀(api_server.py의 /api/reservations/{rid}/approve — 무수정 확인)

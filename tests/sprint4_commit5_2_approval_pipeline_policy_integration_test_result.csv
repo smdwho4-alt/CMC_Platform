@@ -1,0 +1,48 @@
+﻿테스트,결과,상세
+Program Mapping이 resolve_program()을 재사용(신규 Repository 없음),PASS,
+"Validation Context가 validation_context=""reservation_approval""로 연동됨",PASS,
+validate_slot()이 그대로 재사용됨(신규 Policy Engine 없음),PASS,
+_reserve_slot_for_approval() 안에 DataLock 진입이 정확히 1곳(구조 변경 없음),PASS,
+Commit3A 코드(SLOT_FULL/SLOT_BLOCKED/SLOT_ON_HOLD/SLOT_NOT_AVAILABLE/SLOT_INVALID_STATE/SLOT_RESERVATION_CONFLICT)가 삭제되지 않고 그대로 존재(PM §10 유지 요구),PASS,
+engine._update_slot()/engine._release_slot() 재사용 유지(Reserve/Rollback 무수정),PASS,
+"응답 바디에 reason_code 필드가 실제로 구현되지 않음(이번 Commit 범위 아님, 주석과 구분해 정확 검사)",PASS,
+신규 승인 API 엔드포인트 추가 없음(기존 approve/reject 2개만 유지),PASS,
+(1) Program.code 완전일치(SMART) → 정상 승인 200,PASS,200
+(1) Slot 점유 반영(reservedCount 1),PASS,
+(1) Sheets update_status 호출됨,PASS,
+(1) RESERVATION_APPROVED Audit 기록됨,PASS,
+"(2) Program.name 완전일치(온김에검진, Health Check 반영) → 정상 승인 200",PASS,200
+(2) Slot 점유 반영(reservedCount 1),PASS,
+(3) Program Mapping 실패(미매핑 문자열) → 422,PASS,422
+(3) 422 code=RESERVATION_PROGRAM_UNMAPPED,PASS,"{'detail': {'code': 'RESERVATION_PROGRAM_UNMAPPED', 'message': '예약의 검진 프로그램을 확인할 수 없어 승인을 진행할 수 없습니다. 관리자에게 문의해 주세요.'}}"
+(3) Slot 미점유(reservedCount 불변),PASS,
+(3) Sheets update_status 미호출,PASS,
+(3) RESERVATION_APPROVED Audit 미기록,PASS,
+(3) Server Log에 RESERVATION_PROGRAM_UNMAPPED 기록됨,PASS,[POLICY][RESERVATION_PROGRAM_UNMAPPED] reservation_no=20260804-P003 slot_id=SLOT-C52-1100-A program=존재하지않는프로그램
+(3) Server Log에 reservation_no/slot_id/program 필드 포함,PASS,
+(3) Server Log에 PII(이름/전화번호 등) 미포함(QA더미라는 이름 필드 자체가 로그에 없음),PASS,
+(4) program 빈 값 → 422 RESERVATION_PROGRAM_UNMAPPED,PASS,"{'detail': {'code': 'RESERVATION_PROGRAM_UNMAPPED', 'message': '예약의 검진 프로그램을 확인할 수 없어 승인을 진행할 수 없습니다. 관리자에게 문의해 주세요.'}}"
+"(5) BLOCKED Slot 승인 시도 → 409 SLOT_BLOCKED(Execution Layer, Commit3A가 최종 코드 생성)",PASS,"{'detail': {'code': 'SLOT_BLOCKED', 'message': '해당 시간대는 운영상 예약이 차단되어 있습니다.'}}"
+(5) Slot 미점유(reservedCount 0 유지),PASS,
+(5) Sheets update_status 미호출,PASS,
+(5) RESERVATION_APPROVED Audit 미기록,PASS,
+(5b) 근무 의사/간호사 없는 날짜(Slot은 AVAILABLE) → 409 RESERVATION_POLICY_BLOCKED(Policy Layer),PASS,"{'detail': {'code': 'RESERVATION_POLICY_BLOCKED', 'message': '예약 정책 검증에 의해 이 예약을 확정할 수 없습니다.'}}"
+(5b) Sheets update_status 미호출(정책 위반 승인이 나가지 않음),PASS,
+(5b) RESERVATION_APPROVED Audit 미기록,PASS,
+"(5b) Slot 미점유(reservedCount 0 유지, Execution Layer에 도달조차 안 함)",PASS,
+(6) validate_slot() 예외 → 500,PASS,500
+(6) 500 code=SLOT_POLICY_VALIDATION_FAILED,PASS,"{'detail': {'code': 'SLOT_POLICY_VALIDATION_FAILED', 'message': '예약 정책 검증 중 오류가 발생했습니다. 관리자에게 문의해 주세요.'}}"
+(6) Slot 미점유(reservedCount 0 유지),PASS,
+(6) Sheets update_status 미호출,PASS,
+(6) RESERVATION_APPROVED Audit 미기록,PASS,
+(6) Server Log에 SLOT_POLICY_VALIDATION_FAILED 기록됨(예외 경로),PASS,
+(7) Unknown Verdict(정의되지 않은 값) → 500,PASS,500
+(7) 500 code=SLOT_POLICY_VALIDATION_FAILED,PASS,"{'detail': {'code': 'SLOT_POLICY_VALIDATION_FAILED', 'message': '예약 정책 검증 결과를 확인할 수 없습니다. 관리자에게 문의해 주세요.'}}"
+(7) Slot 미점유(reservedCount 0 유지),PASS,
+(7) Sheets update_status 미호출,PASS,
+(7) Server Log에 POLICY_UNKNOWN_VERDICT 기록됨,PASS,
+(8) validate_slot() 반환값이 None(구조 이상) → 500 SLOT_POLICY_VALIDATION_FAILED,PASS,"{'detail': {'code': 'SLOT_POLICY_VALIDATION_FAILED', 'message': '예약 정책 검증 결과를 확인할 수 없습니다. 관리자에게 문의해 주세요.'}}"
+(9) 정의된 INVALID(프로그램 제한 Slot 불일치) → 409(500 아님),PASS,409
+(9) 409 code=RESERVATION_POLICY_BLOCKED,PASS,"{'detail': {'code': 'RESERVATION_POLICY_BLOCKED', 'message': '예약 정책 검증에 의해 이 예약을 확정할 수 없습니다.'}}"
+(9) Slot 미점유(reservedCount 0 유지),PASS,
+(10) 정상 승인 성공 시 slotId 응답 필드 유지(기존 응답 구조 무수정),PASS,"{'ok': True, 'data': {'reservationNo': '20260804-P010', 'previousStatus': '예약접수', 'status': '예약확정', 'slotId': 'SLOT-C52-0900-A', 'processedBy': 'USR-0002', 'processedAt': '2026-07-29T20:57:06+09:00'}}"
