@@ -143,6 +143,52 @@ def _queue_notification(data_dir: Path, reservation: dict, template_code: str, c
 
 # ── 3. Slot 검증 ──────────────────────────────────────────
 
+# Sprint 4 Commit 5-1(Validation Context): validate_slot()의 호출 목적에 따라
+# 일부 검사를 명시적으로 건너뛸 수 있게 한다. 새 Policy Engine이 아니라 기존
+# 함수의 최소 파라미터화다 — 컨텍스트별로 끌 검사 이름의 집합만 사전 정의해 두고,
+# 함수 본문에서는 "이 검사가 disabled_checks에 있는가"만 확인한다.
+# 기본값(slot_generation)은 기존 호출부(create_reservation_request/
+# change_reservation)와 100% 동일하게 전체 검사를 수행한다 — 하위 호환 보장.
+#
+# PM 최종 정책(Commit 5-1 보완): PATIENT_DUPLICATE 검사를 명시적으로 제외하는
+# 컨텍스트는 reservation_approval 단 하나뿐이다. simulation은 slot_generation과
+# 동일하게 전체 검사를 수행한다(dry-run 조회라도 환자 중복 여부는 그대로 알려줘야
+# 의미가 있으므로) — reservation_approval과 동일 취급했던 이전 구현은 PM 승인
+# 설계와 달랐다.
+# 알 수 없는 컨텍스트 문자열이 전달되면 아래 dict.get() 기본값(빈 집합)에 의해
+# 전체 검사가 수행된다 — 이는 "실패 시 차단"이 아니라 "정의되지 않은 컨텍스트는
+# 이미 검증된 가장 안전한 동작(전체 검사)으로 처리한다"는 Safe Default다.
+_CONTEXT_DISABLED_CHECKS: dict[str, frozenset[str]] = {
+    "slot_generation": frozenset(),                             # 전체 검사(기존 동작 그대로)
+    "reservation_approval": frozenset({"PATIENT_DUPLICATE"}),    # Sheets 예약 승인(Commit5) — 환자 식별자가 구조적으로 없음, 이 검사만 제외
+    "simulation": frozenset(),                                   # 전체 검사(PM 최종 정책 — slot_generation과 동일)
+}
+
+
+def resolve_program(program_input: str | None, data_dir: Path | str | None = None) -> dict[str, Any] | None:
+    """Sprint 4 Commit 5-1(Program Mapping Helper): 문자열(코드 또는 이름)을
+    Program Entity로 매핑한다. 새 Repository/ORM/Service Layer를 만들지 않고
+    기존 loader.load_entity("Program")만 재사용한다.
+
+    매칭 순서: Program.code 완전일치 → 실패 시 Program.name 완전일치 → 실패 시 None.
+    Fuzzy/부분일치는 하지 않는다(Health Check에서 확인된 '온김에검진' 사례처럼
+    code가 아니라 name과만 일치하는 프로그램이 있어 2단계 매칭이 필요하다).
+    매핑 실패를 예외로 취급하지 않는다 — 호출자가 실패 처리 정책(Fail Closed 등)을
+    결정한다.
+    """
+    if not program_input:
+        return None
+    data_dir = _dir(data_dir)
+    programs = loader.load_entity("Program", data_dir)
+    for p in programs:
+        if p.get("code") == program_input:
+            return p
+    for p in programs:
+        if p.get("name") == program_input:
+            return p
+    return None
+
+
 def validate_slot(
     slot_id: str,
     patient_id: str,
@@ -150,13 +196,28 @@ def validate_slot(
     data_dir: Path | str | None = None,
     program_id: str | None = None,
     exclude_reservation_id: str | None = None,
+    validation_context: str = "slot_generation",
 ) -> dict[str, Any]:
     """예약 가능 여부 판단.
 
     반환: {"verdict": AVAILABLE|FULL|WAITING|DUPLICATED|HOLD|BLOCKED|INVALID,
            "reasons": [...], "slot": 슬롯레코드|None}
+
+    validation_context(Sprint 4 Commit 5-1, PM 최종 정책): "slot_generation"(기본값)
+    / "reservation_approval" / "simulation" 중 하나. 이 중 "reservation_approval"만
+    환자 동일일자 중복 검사(PATIENT_DUPLICATE)를 명시적으로 건너뛴다(Sheets 예약
+    승인 시 환자 식별자가 구조적으로 없기 때문). "slot_generation"과 "simulation"은
+    둘 다 전체 검사를 수행한다 — simulation도 dry-run 조회일 뿐 환자 중복 여부를
+    숨기지 않는다. 그 외 모든 검사(공휴일/Slot상태/의료진/검사실/운영시간/장비/
+    정원 등)는 컨텍스트와 무관하게 항상 수행된다.
+
+    알 수 없는 컨텍스트 문자열이 전달되면 _CONTEXT_DISABLED_CHECKS.get()의 기본값
+    (빈 집합)에 의해 전체 검사가 수행된다 — Safe Default: 정의되지 않은 컨텍스트는
+    검증이 완화되지 않은, 이미 검증된 가장 안전한 동작(slot_generation과 동일한
+    전체 검사)으로 처리된다.
     """
     data_dir = _dir(data_dir)
+    disabled_checks = _CONTEXT_DISABLED_CHECKS.get(validation_context, frozenset())
 
     def result(verdict: str, reason: str, slot: dict | None = None):
         return {"verdict": verdict, "reasons": [reason], "slot": slot}
@@ -184,13 +245,14 @@ def validate_slot(
     if slot.get("status") == "HOLD":
         return result("HOLD", f"보류 중 Slot: {slot.get('holdReason') or slot_id}", slot)
 
-    # 동일 환자 동일일자 중복예약
-    for r in loader.load_entity("Reservation", data_dir):
-        if (r.get("patientId") == patient_id
-                and r.get("reservationDate") == requested_date
-                and r.get("status") in ACTIVE_STATUSES
-                and r.get("id") != exclude_reservation_id):
-            return result("DUPLICATED", f"동일 환자 동일일자 예약 존재: {r['id']} ({r['status']})", slot)
+    # 동일 환자 동일일자 중복예약 (Sprint 4 Commit 5-1: validation_context로 건너뛸 수 있음)
+    if "PATIENT_DUPLICATE" not in disabled_checks:
+        for r in loader.load_entity("Reservation", data_dir):
+            if (r.get("patientId") == patient_id
+                    and r.get("reservationDate") == requested_date
+                    and r.get("status") in ACTIVE_STATUSES
+                    and r.get("id") != exclude_reservation_id):
+                return result("DUPLICATED", f"동일 환자 동일일자 예약 존재: {r['id']} ({r['status']})", slot)
 
     # 자원 검증: 당일 BLOCKED 처리된 자원 목록
     blocked_refs = {sch.get("refId") for sch in schedules
