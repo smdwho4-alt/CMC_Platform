@@ -71,25 +71,50 @@ function deepEq(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-// ── 0. 정적 확인: 이번 Commit에서 기존 함수/구조에 어떤 영향도 주지 않음 ──
-check('parseApiError가 approveReservation() 정의보다 앞에 위치(연결 없이 정의만 추가)',
+// ── 0. 정적 확인 ──
+// Commit5-3.1 작성 당시에는 "parseApiError가 정의만 되고 아직 호출되지 않음"이
+// 맞는 상태였으나, Sprint5 Commit5-3.2(PM 승인)에서 실제 승인/거절 흐름에 연결하는
+// 것이 그 Commit의 목표였다 — 아래 3개 체크는 "연결 안 됨"에서 "연결됨"으로
+// 뒤집혔다(이 파일이 회귀 스위트로 계속 재사용되므로 최신 승인 상태를 반영한다,
+// Commit5-1→5-2 전환 때와 동일한 처리 방식).
+check('parseApiError가 approveReservation() 정의보다 앞에 위치(정의가 먼저)',
   src.indexOf('function parseApiError(') < src.indexOf('function approveReservation('));
-check('parseApiError가 approveReservation() 함수 본문 안에서 호출되지 않음(연결 없음, Commit5-3.2 범위)', (() => {
+check('parseApiError가 approveReservation() 함수 본문 안에서 호출됨(Commit5-3.2, PM 승인 연결)', (() => {
   const bodyStart = src.indexOf('function approveReservation(');
   const bodyEnd = src.indexOf('function rejectReservation(');
   const body = src.slice(bodyStart, bodyEnd);
-  return !body.includes('parseApiError(');
+  return body.includes('parseApiError(');
 })());
-check('parseApiError가 rejectReservation() 함수 본문 안에서 호출되지 않음(연결 없음, Commit5-3.2 범위)', (() => {
+check('parseApiError가 rejectReservation() 함수 본문 안에서 호출됨(Commit5-3.2, PM 승인 연결)', (() => {
   const bodyStart = src.indexOf('function rejectReservation(');
   const bodyEnd = src.indexOf('rejectConfirmBtn.addEventListener');
   const body = src.slice(bodyStart, bodyEnd);
-  return !body.includes('parseApiError(');
+  return body.includes('parseApiError(');
 })());
-check('_SLOT_CONFLICT_CODES 배열이 이번 Commit에서 무수정(6개 그대로)',
-  src.includes("_SLOT_CONFLICT_CODES = [\n    'SLOT_NOT_AVAILABLE', 'SLOT_FULL', 'SLOT_BLOCKED', 'SLOT_ON_HOLD',\n    'SLOT_INVALID_STATE', 'SLOT_RESERVATION_CONFLICT',\n  ];"));
-check('_extractDetailMessage()가 이번 Commit에서 무수정(그대로 존재)',
-  src.includes('function _extractDetailMessage(body, fallback)'));
+check('_SLOT_CONFLICT_CODES 배열에 RESERVATION_POLICY_BLOCKED가 추가됨(Commit5-3.2 STEP3 P0 수정, PM 승인)',
+  src.includes("_SLOT_CONFLICT_CODES = [\n    'SLOT_NOT_AVAILABLE', 'SLOT_FULL', 'SLOT_BLOCKED', 'SLOT_ON_HOLD',\n    'SLOT_INVALID_STATE', 'SLOT_RESERVATION_CONFLICT',\n    'RESERVATION_POLICY_BLOCKED',\n  ];"));
+check('approveReservation() 409 분기가 parseApiError().code로 _SLOT_CONFLICT_CODES를 판별함(문자열 직접비교 아님, STEP2)', (() => {
+  const bodyStart = src.indexOf('function approveReservation(');
+  const bodyEnd = src.indexOf('function rejectReservation(');
+  const body = src.slice(bodyStart, bodyEnd);
+  return body.includes('_SLOT_CONFLICT_CODES.indexOf(parsed.code)') && body.includes('showToast(parsed.message');
+})());
+check('approveReservation()/rejectReservation() 둘 다 AbortController + 8초 Timeout 적용됨(STEP6)', (() => {
+  const bodyStart = src.indexOf('function approveReservation(');
+  const bodyEnd = src.indexOf('rejectConfirmBtn.addEventListener');
+  const body = src.slice(bodyStart, bodyEnd);
+  const hasAbort = (body.match(/new AbortController\(\)/g) || []).length === 2;
+  const hasTimeout = (body.match(/setTimeout\(function \(\) \{ controller\.abort\(\); \}, 8000\)/g) || []).length === 2;
+  const hasSignal = (body.match(/signal: controller\.signal/g) || []).length === 2;
+  const hasAbortErrorCatch = (body.match(/err\.name === 'AbortError'/g) || []).length === 2;
+  return hasAbort && hasTimeout && hasSignal && hasAbortErrorCatch;
+})());
+check('Toast/Dialog/CSS 신규 정의 없음(showToast/rejectModal 정의부 무수정, 호출부만 확장, STEP4)',
+  src.includes('function showToast(message, type)')
+  && (src.match(/function showToast\(/g) || []).length === 1);
+check('_extractDetailMessage()는 정의가 남아있으나 이제 호출부가 없음(parseApiError로 대체, Commit5-3.2)',
+  src.includes('function _extractDetailMessage(body, fallback)')
+  && (src.match(/_extractDetailMessage\(/g) || []).length === 1);
 check('showToast() 정의는 이번 Commit에서 무수정(존재 여부만 확인, 호출부 변경 없음)',
   src.includes('function showToast(message, type)'));
 

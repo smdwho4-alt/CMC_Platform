@@ -366,8 +366,12 @@ check("(23)~(28) 6개 Slot 코드 전부 프론트 분기 목록에 포함",
       all(c in _PORTAL_HTML for c in (
           "SLOT_NOT_AVAILABLE", "SLOT_FULL", "SLOT_BLOCKED", "SLOT_ON_HOLD",
           "SLOT_INVALID_STATE", "SLOT_RESERVATION_CONFLICT")))
-check("_SLOT_CONFLICT_CODES 배열로 코드 목록을 한 곳에서만 관리(중복 정의 없음)",
-      "_SLOT_CONFLICT_CODES.indexOf(code)" in _PORTAL_HTML)
+# Sprint 5 Commit 5-3.2: parseApiError()(Portal Error Contract Parser) 도입으로
+# 코드 판별 변수명이 로컬 `code`에서 표준 Parser 결과의 `parsed.code`로 바뀌었다
+# (배열 자체를 한 곳에서만 관리한다는 원래 취지는 그대로 유지 — 여전히
+# _SLOT_CONFLICT_CODES 배열 하나만 존재하고, 판별식도 여전히 그 배열의 indexOf 하나뿐).
+check("_SLOT_CONFLICT_CODES 배열로 코드 목록을 한 곳에서만 관리(중복 정의 없음, Commit5-3.2 이후 parsed.code로 판별)",
+      "_SLOT_CONFLICT_CODES.indexOf(parsed.code)" in _PORTAL_HTML)
 check("(29) 오류 후 목록 재조회(load) 정책 유지", "load(false);" in _PORTAL_HTML)
 check("(30) browser alert() 미사용(신규 코드에도 토스트만 사용)", "alert(" not in _PORTAL_HTML)
 check("신규 Portal 탭 추가 없음(기존 6개 탭 그대로)", _PORTAL_HTML.count("<button data-view=") == 6)

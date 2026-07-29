@@ -40,7 +40,7 @@ Rollback 자체 실패 시 500 SLOT_ROLLBACK_FAILED로 격상(일반 Audit 실�
 (21) 이미 예약확정인 건 재승인 → 기존 409(전이 불가) 회귀 없음,PASS,{'detail': '현재 상태(예약확정)에서 처리할 수 없습니다 — 다른 사용자가 이미 처리했거나 승인/거절 대상 상태가 아닙니다.'}
 (22) 거절 API 회귀 없음(200),PASS,200
 (23)~(28) 6개 Slot 코드 전부 프론트 분기 목록에 포함,PASS,
-_SLOT_CONFLICT_CODES 배열로 코드 목록을 한 곳에서만 관리(중복 정의 없음),PASS,
+"_SLOT_CONFLICT_CODES 배열로 코드 목록을 한 곳에서만 관리(중복 정의 없음, Commit5-3.2 이후 parsed.code로 판별)",PASS,
 (29) 오류 후 목록 재조회(load) 정책 유지,PASS,
 (30) browser alert() 미사용(신규 코드에도 토스트만 사용),PASS,
 신규 Portal 탭 추가 없음(기존 6개 탭 그대로),PASS,
