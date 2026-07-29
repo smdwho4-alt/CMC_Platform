@@ -2,26 +2,27 @@
 
 > 이 문서는 프로젝트의 **현재 시점 상태 스냅샷**이다. 최신 정보를 유지하는 것이 원칙이며, 상태가 바뀔 때마다 갱신한다.
 
-**최종 갱신**: 2026-07-28 (Sprint 4 Commit 1 — SSOT 문서 정렬 반영)
-**버전**: v1.1.0-beta1 (DEV-004 태그, 2026-07-12) — 이전 릴리스: [RELEASE_REPORT_v1.0.0-pilot_new.md](RELEASE_REPORT_v1.0.0-pilot_new.md), [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md)
-**단계**: Sprint A~I + Sprint 2(Dashboard v3) + DEV-003/DEV-004 완료 → **Architecture Freeze(Sprint 0) 완료** → Single Admin Portal Sprint 1~3(별도 트랙) 완료 → Sprint 3.5(Architecture Review) 완료 → **Sprint 4(Reservation Core Integration) 진행 중 — Commit 0 완료, Commit 1 진행 중**
-**Git Push 상태**: 로컬 커밋이 origin 대비 다수 ahead, 0 behind(§0 참조). **이번 세션 포함 어떤 Sprint 4 작업물도 origin에 push되지 않았다** — push는 PM이 명시적으로 승인한 시점에만 수행한다(ADR-012).
+**최종 갱신**: 2026-07-29 (Sprint 7 Commit7-1 — SSOT Documentation Synchronization)
+**버전**: v1.1.0-beta1 (DEV-004 태그, 2026-07-12, 최신 태그) — Sprint 3~7 작업물은 아직 별도 태그 없음. 이전 릴리스: [RELEASE_REPORT_v1.0.0-pilot_new.md](RELEASE_REPORT_v1.0.0-pilot_new.md), [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md)
+**단계**: Sprint A~I + Sprint 2(Dashboard v3) + DEV-003/DEV-004 완료 → **Architecture Freeze(Sprint 0) 완료** → Single Admin Portal Sprint 1~3(별도 트랙)·Sprint 3.5(Architecture Review) 완료 → **Sprint 4(Reservation Core Integration) 완료**(Commit 0/1/2/3/3A/5-1/5-2, 상세 §1) → **Sprint 5(Portal Integration) 완료**(Commit5-3.1/5-3.2/5-3.3) → **Sprint 6(Legacy Guard·Technical Debt Cleanup) 완료**(Commit6-1/6-2/6-3) → **Sprint 7("Operation Readiness Sprint") 진행 중 — Design Freeze(Commit7-0) 완료, Commit7-1(SSOT 동기화, 본 갱신) 진행 중**
+**공식 Baseline**: `4f21d0e`(Sprint6 Closeout, PM 확정) → Sprint7 Commit7-0(`3c42c97`) 위에서 진행 중
+**Git Push 상태**: 로컬 커밋이 origin 대비 35 ahead, 0 behind(§0 참조). **Sprint 3~7 어떤 작업물도 origin에 push되지 않았다** — push는 PM이 명시적으로 승인한 시점에만 수행한다(ADR-012).
 
-> **Architecture Freeze**와 **Pilot Ready(운영 파일럿 투입 가능 여부)**는 서로 다른 개념으로 별도 관리한다. Architecture Freeze는 설계·구조·표준 문서의 확정이며, 미해결 버그 존재와 무관하게 완료될 수 있다(DECISIONS.md ADR-010). Pilot Ready는 아래 §2의 Known Issues가 모두 해소되어야 충족된다.
+> **Architecture Freeze**와 **Pilot Ready(운영 파일럿 투입 가능 여부)**는 서로 다른 개념으로 별도 관리한다. Architecture Freeze는 설계·구조·표준 문서의 확정이며, 미해결 버그 존재와 무관하게 완료될 수 있다(DECISIONS.md ADR-010). Pilot Ready는 아래 §2의 Known Issues가 모두 해소되어야 충족된다. **아래 "Pilot Ready 🟢 조건부 충족" 판정은 2026-07-12(v1.0.0-pilot 태그) 시점 기준이며 Sprint 4~6에서 추가된 예약 승인/Slot/Policy 기능은 아직 반영해 재평가하지 않았다 — 재평가는 Sprint 7 Commit7-2(Operation Readiness Assessment)에서 수행한다.**
 
-> **프로젝트 구조는 v0.9.0 현재 상태로 Freeze되었다.** 구조 변경 작업은 중단하고 Pilot 종료 후 v1.0 작업으로 이관한다(DECISIONS.md ADR-011). 구조 관련 기준 문서는 [docs/STRUCTURE_REORG_ANALYSIS_new.md](docs/STRUCTURE_REORG_ANALYSIS_new.md)이다.
+> **프로젝트 구조는 v0.9.0 현재 상태로 Freeze되었다.** 구조 변경 작업은 중단하고 Pilot 종료 후 v1.0 작업으로 이관한다(DECISIONS.md ADR-011). 구조 관련 기준 문서는 [docs/STRUCTURE_REORG_ANALYSIS_new.md](docs/STRUCTURE_REORG_ANALYSIS_new.md)이다. Sprint 4~7 기간에도 이 원칙은 유지됐다(구조 변경 없음).
 
-**현재 최우선 작업 순서**: ~~① STEP1.5 DateFix → ② 전체 QA → ③ Pilot Release~~ **완료** → Single Admin Portal Sprint 1~3·Sprint 3.5 **완료** → **Sprint 4(Reservation Core Integration) Commit 1 진행 중** → 다음: Sprint 4 Commit 2(예약 승인) PM 승인 대기
+**현재 최우선 작업 순서**: ~~① STEP1.5 DateFix → ② 전체 QA → ③ Pilot Release~~ **완료** → ~~Single Admin Portal Sprint 1~3·Sprint 3.5~~ **완료** → ~~Sprint 4(Reservation Core Integration)~~ **완료** → ~~Sprint 5(Portal Integration)~~ **완료** → ~~Sprint 6(Legacy Guard·TD Cleanup)~~ **완료** → **Sprint 7("Operation Readiness Sprint") 진행 중 — Commit7-1(SSOT 동기화) 진행 중, 다음은 Commit7-2(Operation Readiness Assessment) PM 승인 대기**
 
-## 0. Git Push / 배포 상태 (Sprint 4 Commit 1에서 신설)
+## 0. Git Push / 배포 상태 (Sprint 4 Commit 1에서 신설, Sprint 7 Commit7-1에서 갱신)
 
 | 항목 | 상태 |
 |---|---|
-| origin 대비 로컬 커밋 | **다수 ahead, 0 behind**(정확한 수치는 `git rev-list --count origin/main..HEAD`로 확인 — 이 문서 갱신 시점 기준 22개, 본 Commit 1 반영 후 23개 예상) |
-| origin 마지막 반영 커밋 | `b390fa1`(2026-07-12, "docs: v1.0.0-pilot 릴리스 문서 갱신") |
-| origin에 아직 없는 것 | `v1.1.0-beta1` 태그(DEV-004, `git ls-remote --tags origin`으로 미존재 확인) 및 그 이후 커밋 전체(Single Admin Portal Sprint 1~3, Sprint 3.5, Sprint 4). `v1.0.0-pilot` 태그는 origin에 이미 존재(push 완료 확인). |
+| origin 대비 로컬 커밋 | **35 ahead, 0 behind**(`git rev-list --count origin/main..HEAD` / `HEAD..origin/main` 재확인, 이 문서 갱신 시점 기준) |
+| origin 마지막 반영 커밋 | `b390fa1`(2026-07-12, "docs: v1.0.0-pilot 릴리스 문서 갱신") — Sprint 3~7 전체 기간 동안 origin 변동 없음 |
+| origin에 아직 없는 것 | `v1.1.0-beta1` 태그 이후 커밋 전체(Single Admin Portal Sprint 1~3, Sprint 3.5, Sprint 4~7). `v1.0.0-pilot` 태그는 origin에 이미 존재(push 완료 확인). |
 | 이번 세션의 push 여부 | **push하지 않음.** push는 PM이 명시적으로 승인한 시점에만 수행(ADR-012) |
-| GAS 실배포 상태 | STEP1.5 DateFix는 2026-07-12 실배포 완료(GAS Version 5, §2 참조). **Sprint 4 Commit 0/1은 GAS/FastAPI/Portal 코드를 전혀 변경하지 않았으므로 이번 Sprint 4 진행분에 대한 별도 배포 자체가 아직 발생하지 않았다.** |
+| GAS 실배포 상태 | STEP1.5 DateFix는 2026-07-12 실배포 완료(GAS Version 5, §2 참조). **Sprint 4~7의 어떤 Commit도 GAS/Apps Script 코드를 변경하지 않았으므로**(Sprint 4 Commit 2/3/3A/5-1/5-2는 FastAPI·Portal만, Sprint 5/6/7은 Portal·문서만) **이 배포 상태 이후 추가 GAS 배포는 발생하지 않았다.** |
 
 ---
 
@@ -45,7 +46,15 @@
 | Single Admin Portal Sprint 1~3(별도 트랙) | ✅ **완료** — RBAC/CRM통합/Audit/AI지원/운영자UX 등 전 Commit, Sprint3_Final_Report_v1.0.md 참조 |
 | Sprint 3.5(Platform Integration Architecture Review) | ✅ **완료** — `Platform_Integration_Architecture_Review_v1.0.md` |
 | **Sprint 4 Commit 0**(문서 Baseline) | ✅ **완료**(2026-07-28) |
-| **Sprint 4 Commit 1**(SSOT 문서 정렬) | 🔄 **진행 중**(본 갱신 자체가 이 Commit의 산출물) |
+| **Sprint 4 Commit 1**(SSOT 문서 정렬) | ✅ **완료**(2026-07-28, `14d9543`) |
+| **Sprint 4 Commit 2**(예약 승인, Reservation Approval Foundation) | ✅ **완료**(`ea86e48`) |
+| **Sprint 4 Commit 3**(Slot 통합, Reservation Slot Integration) | ✅ **완료**(`e86c5eb`) |
+| **Sprint 4 Commit 3A**(Slot Integration Hardening) | ✅ **완료**(`bba3b95`) |
+| **Sprint 4 Commit 5-1**(Validation Context + Program Mapping Helper) | ✅ **완료**(`b6ca40e`) |
+| **Sprint 4 Commit 5-2**(Approval Pipeline Policy Integration, 5-2A 포함) | ✅ **완료**(`2752df5`) — 원래 계획된 "Commit 4(문진)"/"Commit 6(통합QA)"는 착수하지 않고 Commit 번호가 5-1/5-2로 재편됐다(ROADMAP.md 참조) |
+| **Sprint 5**(Portal Integration — Commit5-3.1 Parser/5-3.2 Admin UX/5-3.3 Legacy Migration Prep) | ✅ **완료**(`b66a363`/`0f0ef83`/`861ec01`) |
+| **Sprint 6**(Legacy Guard·Technical Debt Cleanup — Commit6-1/6-2/6-3) | ✅ **완료**(`306a3a0`/`e130254`/`4f21d0e`) — TD-S5-04(Legacy 승인 우회) **부분 해소** |
+| **Sprint 7**("Operation Readiness Sprint") | 🔄 **진행 중** — Design Freeze(Commit7-0, `3c42c97`) 완료, Commit7-1(SSOT 동기화, 본 갱신) 진행 중 |
 
 ---
 
@@ -105,13 +114,16 @@
 | 항목 | 상태 | 비고 |
 |---|---|---|
 | `admin_reservations_v2_new.html` (DEV-003 구현) | ✅ 완료 (Live 검증 포함) | §2-1 Release Checklist 참조 |
-| 더미 예약 데이터 정리 | 파일럿 1주차 허용 | `data/reservations.json` 중 QA 더미 |
-| 더미 계정 정리 (USR-0001~0003) | WARN, 운영 전 정리 필요 | `data/users.json` |
-| LLM 기반 의도 분류 전환 | 규칙 기반이 기본, Claude API는 Key 설정 시만 | `agent_orchestrator.py` 교체 지점 주석 있음 |
-| 실키 실호출 스모크 테스트 | 미실시 (`CSHSP_SMOKE_LIVE=1` 옵트인) | 파일럿 전 1회 필요 |
-| SQLite 마이그레이션 | 계획 문서만 존재 | `docs/SQLite_Migration_Plan.md` |
-| 관리자 인증(로그인) | 미구현 | 운영 전 필수 |
-| HTTPS 적용 | 시제품 미적용 | 운영 전 필수 |
+| `admin_reservations_v2_new.html` 예약확정 우회 | ✅ **부분 해소**(Sprint 6 Commit6-1) | TD-S5-04 Partial — ARCHITECTURE.md §7-4 참조, 완전 해소는 Sprint7 이후 별도 Sprint |
+| 더미 예약 데이터 정리 | 여전히 미착수 | `data/reservations.json` 중 QA 더미 — Sprint 7 Operation Readiness Checklist(§10-4)에서 최종 확인 예정(`Sprint7_Design_Freeze_v1.0.md`) |
+| 더미 계정 정리 (USR-0001~0003) | WARN, 운영 전 정리 필요 | `data/users.json` — 위와 동일하게 Sprint 7에서 확인 예정 |
+| LLM 기반 의도 분류 전환 | 규칙 기반이 기본, Claude API는 Key 설정 시만 | `agent_orchestrator.py` 교체 지점 주석 있음, Sprint 4~7 범위 밖 |
+| 실키 실호출 스모크 테스트 | 미실시 (`CSHSP_SMOKE_LIVE=1` 옵트인) | 파일럿 전 1회 필요, Sprint 7 Operation Readiness 대상 후보 |
+| SQLite 마이그레이션 | 계획 문서만 존재 | `docs/SQLite_Migration_Plan.md`, 시점 미정 |
+| 관리자 인증(로그인) | 미구현 | 운영 전 필수, Sprint 7 범위 밖(Sprint7은 신규 기능 미개발 원칙) |
+| HTTPS 적용 | 시제품 미적용 | 운영 전 필수, Sprint 7 Operation Readiness Checklist(§10-5) 대상 후보 |
+| TD-S5-03(`nav_new.js` 오래된 링크) | Deferred | Sprint 7 Commit7-7(P2, Technical Debt Cleanup Round 2) 대상 |
+| TD-S5-05(`sprint3_rbac` 테스트 CSV 스냅숏 미갱신) | Deferred(결함 아님) | Sprint 7 Commit7-7 대상 — 원인은 Sprint6 Closeout에서 이미 확정(6→10건, 정상 누적) |
 
 ---
 
@@ -143,5 +155,10 @@ E. 기능     PASS (금지응답 35/35, 백업·복구 9/9)
 - Pilot 최종 검토: [PILOT_READINESS_REVIEW.md](PILOT_READINESS_REVIEW.md)
 - 구조 기준 문서(Freeze, v1.0 재검토용): [docs/STRUCTURE_REORG_ANALYSIS_new.md](docs/STRUCTURE_REORG_ANALYSIS_new.md)
 - Sprint 4 Reservation Core 아키텍처: [Reservation_Core_Architecture_v1.0.md](Reservation_Core_Architecture_v1.0.md)
-- Sprint 4 구현 계획(Commit 0~6): [Sprint4_Implementation_Plan_v1.0.md](Sprint4_Implementation_Plan_v1.0.md)
+- Sprint 4 구현 계획(Commit 0~6, 원안 — 실제 실행은 Commit 5-1/5-2로 재편됨): [Sprint4_Implementation_Plan_v1.0.md](Sprint4_Implementation_Plan_v1.0.md)
 - Sprint 3.5 통합 아키텍처 리뷰: [Platform_Integration_Architecture_Review_v1.0.md](Platform_Integration_Architecture_Review_v1.0.md)
+- Sprint 5 Portal Integration 설계: [Sprint5_Portal_Integration_Implementation_Plan_v1.0.md](Sprint5_Portal_Integration_Implementation_Plan_v1.0.md)
+- Sprint 5 Legacy Migration Preparation: [Sprint5_Commit5_3_3_Legacy_Migration_Preparation_v1.0.md](Sprint5_Commit5_3_3_Legacy_Migration_Preparation_v1.0.md)
+- Sprint 6 Design Freeze: [Sprint6_Design_Freeze_v1.0.md](Sprint6_Design_Freeze_v1.0.md)
+- Sprint 6 Closeout Report: [Sprint6_Closeout_Report_v1.0.md](Sprint6_Closeout_Report_v1.0.md)
+- Sprint 7 Design Freeze("Operation Readiness Sprint"): [Sprint7_Design_Freeze_v1.0.md](Sprint7_Design_Freeze_v1.0.md)
