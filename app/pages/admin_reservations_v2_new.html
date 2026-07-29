@@ -339,12 +339,26 @@ const AA = {
     const noteChanged   = newNote   !== (cached.note || '');
     if (!statusChanged && !noteChanged) { this.closeModal(); return; }
 
+    // Sprint 6 Commit6-1(Legacy Reservation Approval Transition Guard): "예약확정"으로의
+    // 전이만 이 화면에서 저장하지 않는다 — 이 전이는 Sprint4 Commit3/3A/5-2의 Slot
+    // 점유·Capacity·중복·Policy(휴진일/의료진/검사실/장비/프로그램 제한) 검증을 전부
+    // 우회하기 때문이다. 그 외 전이(검진완료/일정변경/예약취소/거절)와 메모 저장은
+    // reservation_approval_states.py가 원래부터 "이 화면이 전담한다"고 명시한 범위이므로
+    // 무영향으로 유지한다(Sprint6 Design Freeze v1.0 §1-1). 새 Business Rule을 만드는
+    // 것이 아니라 이 한 가지 쓰기 동작만 클라이언트에서 막는 안전장치이며, 실제 승인
+    // 판단은 여전히 FastAPI 승인 API(Admin Portal)가 전담한다.
+    const approvalBlocked = statusChanged && newStatus === '예약확정';
+
     this.toast('저장 중입니다...');
     let statusOk = !statusChanged, noteOk = !noteChanged;
     let statusErr = '', noteErr = '';
     let anySuccess = false;
 
-    if (statusChanged) {
+    if (approvalBlocked) {
+      document.getElementById('statusSel').value = cached.status; // 화면 표시를 원래 상태로 되돌림(전송하지 않음)
+      statusOk = false;
+      statusErr = '예약확정은 이 화면에서 처리할 수 없습니다. Admin Portal의 승인 버튼을 이용해 주세요.';
+    } else if (statusChanged) {
       const prevStatus = cached.status;
       cached.status = newStatus; this.render();
       const res = await CMC_SheetsServiceV2.updateStatus(no, newStatus);
