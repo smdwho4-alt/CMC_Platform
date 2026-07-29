@@ -273,8 +273,12 @@ check("검진유형(기업/영유아/특수건강진단) 정원 로직 없음",
 _PORTAL_HTML = (ROOT / "app" / "pages" / "admin_portal_new.html").read_text(encoding="utf-8")
 check("(14)/(15) SLOT_NOT_AVAILABLE/SLOT_FULL 코드 분기 존재",
       "SLOT_NOT_AVAILABLE" in _PORTAL_HTML and "SLOT_FULL" in _PORTAL_HTML)
-check("_extractDetailMessage 헬퍼로 구조화된 detail(code/message) 처리",
-      "function _extractDetailMessage(" in _PORTAL_HTML)
+# Sprint 6 Commit6-2(TD-S5-01 Resolved): _extractDetailMessage()는 호출부가 완전히
+# 사라져 삭제되고 parseApiError()(Sprint5 Commit5-3.1/5-3.2)로 일원화됐다. 구조화된
+# detail(code/message) 처리라는 원래 취지는 parseApiError()가 그대로 계승한다.
+check("구조화된 detail(code/message) 처리 — parseApiError()로 일원화됨(_extractDetailMessage 삭제, TD-S5-01)",
+      "function parseApiError(httpStatus, detail)" in _PORTAL_HTML
+      and "function _extractDetailMessage(" not in _PORTAL_HTML)
 check("(16) Toast(showToast) 재사용, 신규 알림 시스템 없음",
       _PORTAL_HTML.count("showToast(") >= 8)
 check("(17) 처리 후 목록 재조회(load) 유지", "load(false);" in _PORTAL_HTML)

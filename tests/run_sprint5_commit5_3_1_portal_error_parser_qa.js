@@ -112,9 +112,13 @@ check('approveReservation()/rejectReservation() 둘 다 AbortController + 8초 T
 check('Toast/Dialog/CSS 신규 정의 없음(showToast/rejectModal 정의부 무수정, 호출부만 확장, STEP4)',
   src.includes('function showToast(message, type)')
   && (src.match(/function showToast\(/g) || []).length === 1);
-check('_extractDetailMessage()는 정의가 남아있으나 이제 호출부가 없음(parseApiError로 대체, Commit5-3.2)',
-  src.includes('function _extractDetailMessage(body, fallback)')
-  && (src.match(/_extractDetailMessage\(/g) || []).length === 1);
+// TD-S5-01 Resolved(Sprint6 Commit6-2): 호출부가 완전히 사라졌던 _extractDetailMessage()
+// 함수 정의 자체를 삭제해 parseApiError() 하나로 일원화했다. 함수 정의는 완전히
+// 사라져야 하고, 남은 참조는 이 삭제 사실을 설명하는 주석 하나뿐이어야 한다.
+check('_extractDetailMessage() 함수 정의가 삭제됨(TD-S5-01 Resolved)',
+  !src.includes('function _extractDetailMessage(body, fallback)'));
+check('_extractDetailMessage 문자열 참조가 이력 설명 주석 1건만 남음(실호출부 없음)',
+  (src.match(/_extractDetailMessage/g) || []).length === 1);
 check('showToast() 정의는 이번 Commit에서 무수정(존재 여부만 확인, 호출부 변경 없음)',
   src.includes('function showToast(message, type)'));
 

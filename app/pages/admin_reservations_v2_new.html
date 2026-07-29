@@ -243,10 +243,18 @@ const AA = {
     this.renderStats(); this.renderTable(); this.renderPagination();
   },
 
-  /** 통계 카드는 설계 §7.1에 따라 Sheets 캐시가 아닌 기존 CMC_DB/CMC_Stats(Local)를 그대로 사용 */
+  /** Sprint 6 Commit6-2(TD-S5-02): 원래는 설계 §7.1에 따라 CMC_DB/CMC_Stats(로컬
+   * localStorage 샘플)를 사용했으나, 아래 예약 목록 테이블은 this.cache(실제 Sheets
+   * 데이터, loadAll()이 이미 전체 목록을 채워둠 — google_sheets_service_v2_new.js::
+   * _liveGetAll()과 GAS _actionList()를 확인한 결과 필터 파라미터 없이 호출하면
+   * Sheet 전체 행을 페이지네이션 없이 반환하므로 부분 집계 위험 없음)를 사용해,
+   * 통계 카드와 목록 테이블의 데이터 소스가 서로 달랐다(Sprint5 Closeout에서 발견,
+   * TD-S5-02로 등록). 신규 API 호출·신규 필드 없이 이미 로드된 this.cache로 동일하게
+   * 집계하도록 최소 변경한다 — 카드 항목·표시 방식은 무변경. */
   renderStats() {
-    const all = CMC_DB.getAll();
-    const c   = CMC_Stats.statusCounts();
+    const all = this.cache;
+    const c   = {};
+    all.forEach(r => { c[r.status] = (c[r.status] || 0) + 1; });
     document.getElementById('st-total').textContent    = all.length;
     document.getElementById('st-접수').textContent     = c['예약접수']||0;
     document.getElementById('st-확정').textContent     = c['예약확정']||0;

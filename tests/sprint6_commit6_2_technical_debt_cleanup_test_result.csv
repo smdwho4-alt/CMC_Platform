@@ -1,0 +1,13 @@
+﻿테스트,결과,상세
+"TD-S5-01: _extractDetailMessage() 함수 정의가 admin_portal_new.html에서 삭제됨",PASS,""
+"TD-S5-01: parseApiError()는 그대로 존재(대체 함수 무수정)",PASS,""
+"TD-S5-01: approveReservation()/rejectReservation()이 여전히 parseApiError만 사용(회귀 없음)",PASS,""
+"TD-S5-02: renderStats()가 CMC_DB.getAll()을 더 이상 사용하지 않음",PASS,""
+"TD-S5-02: renderStats()가 this.cache를 데이터 소스로 사용함",PASS,""
+"TD-S5-02: 다른 곳(예: openModal/saveStatus)의 CMC_DB/CMC_Stats 사용은 무변경(범위 밖 확대 변경 없음)",PASS,""
+"TD-S5-02: 전체 건수(7건)가 this.cache.length 그대로 반영",PASS,"7"
+"TD-S5-02: 예약접수 카운트(2건) 정확",PASS,"2"
+"TD-S5-02: 예약확정 카운트(1건) 정확",PASS,"1"
+"TD-S5-02: 검진완료 카운트(1건) 정확",PASS,"1"
+"TD-S5-02: 취소·변경 합산(예약취소1+일정변경1=2건) 정확",PASS,"2"
+"TD-S5-02: 빈 cache에서도 예외 없이 전부 0 처리",PASS,""
