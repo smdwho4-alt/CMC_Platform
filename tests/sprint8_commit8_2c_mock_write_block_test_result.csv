@@ -1,0 +1,17 @@
+﻿시나리오,결과,상세,Write부작용
+1. Mock+CSRF없음+승인 → 403,PASS,403,GAS호출=0
+2. Mock+CSRF있음(위조)+승인 → 403,PASS,403,GAS호출=0
+3. Mock+CSRF없음+거절 → 403,PASS,403,GAS호출=0
+4. Mock+CSRF있음(위조)+거절 → 403,PASS,403,GAS호출=0
+"5. Mock+예약상태변경(cancel, 구버전 API) → 403",PASS,403,호출=0
+"5b. Mock+검진상태변경(complete, 구버전 API) → 403",PASS,403,N/A
+"6. Mock+계정관리 Write 요청 → 해당 API 자체가 저장소에 존재하지 않음(N/A, 추정 금지)",PASS,계정 생성/수정/삭제 API 0건 확인(grep 전수조사),N/A
+"7. Mock+역할관리 Write 요청 → 해당 API 자체가 저장소에 존재하지 않음(N/A, 추정 금지)",PASS,역할 생성/수정/삭제 API 0건 확인(grep 전수조사),N/A
+8/9. 위 1~5b의 모든 Mock 상태변경 시도에서 Fake Sheets/GAS Adapter 호출 횟수 누적 0,PASS,누적 호출=0,N/A
+10. Mock 상태변경 차단 요청으로 인한 SQLite 사용자·세션 테이블 변경 없음(감사로그 테이블만 차단 기록으로 증가하는 것은 정상 — 부작용이 아니라 통제의 증거),PASS,"{'auth_users': 1, 'auth_sessions': 1, 'auth_audit_log': 8} -> {'auth_users': 1, 'auth_sessions': 1, 'auth_audit_log': 9}",N/A
+"11. 존재하지 않는 X-User-Id로도 우회 불가(401, 애초에 인증 자체 실패)",PASS,401,N/A
+11b. 세션 사용자의 진짜 CSRF Token을 Mock 요청에 첨부해도 우회 불가(Mock은 auth_method로만 판정),PASS,403,N/A
+12. roleId를 헤더로 위조 주입해도 무시되고(서버가 실제 조회한 값만 사용) 여전히 403,PASS,403,N/A
+"13. 세션+정상 CSRF+적정 권한 → CSRF/RBAC 통과, 기존 경로 도달(403 아님, 실제 GAS Fake 호출 발생)",PASS,"503 {""detail"":""CSHSP_GAS_WEBAPP_URL 환경변수가 설정되지 않았습니다. Sheets 조회 기능을 사용하려면 서버 환경변수로 GAS Web App URL을 설정해야 합니다.""}",GAS호출=0(>=1이어야 정상 동작 보존 증거)
+14. 세션+CSRF없음 → 기존 CSRF 차단 유지(403),PASS,403,N/A
+"15. 권한 없는 실제 세션 사용자(ROLE-CRM, reservation:approve 없음) → 기존 RBAC 차단 유지(403)",PASS,403,N/A

@@ -92,6 +92,7 @@ def build_require_session_user(data_dir: Path | str):
             if result is not None:
                 request.state.csrf_token = result["csrf_token"]
                 request.state.session_id = result["session_id"]
+                request.state.auth_method = "session"
                 return result["identity"]
 
         x_user_id = request.headers.get("X-User-Id")
@@ -106,8 +107,13 @@ def build_require_session_user(data_dir: Path | str):
             )
             if not user or user.get("status") != "ACTIVE":
                 raise HTTPException(401, f"유효하지 않은 사용자: {x_user_id}")
-            request.state.csrf_token = None  # Mock 경로는 CSRF 보호 대상 API에서 별도 차단됨
+            request.state.csrf_token = None
             request.state.session_id = None
+            # Mock 경로임을 서버가 스스로 판정해 기록한다(클라이언트가 보낸 어떤 값도
+            # 신뢰하지 않음 — X-User-Id/roleId 등은 신원 조회에만 쓰이고, "이 요청이
+            # Mock 경로로 인증됐다"는 사실 자체는 이 분기에 실제로 도달했다는 것으로만
+            # 판정한다). require_write_block(Commit8-2c)가 이 값으로 상태변경을 차단한다.
+            request.state.auth_method = "mock"
             return user
 
         raise HTTPException(401, "인증이 필요합니다")
@@ -115,35 +121,53 @@ def build_require_session_user(data_dir: Path | str):
     return require_session_user
 
 
+def _audit_write_blocked(request: Request, user: dict[str, Any], event_type: str, reason_code: str) -> None:
+    data_dir = getattr(request.app.state, "cshsp_data_dir", None)
+    if not data_dir:
+        return
+    store.init_schema(data_dir)
+    with store.connect(data_dir) as conn:
+        store.append_auth_audit(
+            conn, audit_id=f"AUD-AUTH-{uuid.uuid4().hex}",
+            event_type=event_type, actor_user_id=user.get("id"),
+            request_id=request.headers.get("X-Request-Id"),
+            route=str(request.url.path), result="FAILURE",
+            reason_code=reason_code, source_env=current_env(),
+        )
+
+
 def build_require_csrf(require_user):
     """상태변경 API 전용 — require_user와 동일한 함수 객체를 넘겨받아 FastAPI가
     한 요청 내에서 세션 검증을 한 번만 수행하도록 한다(Depends 캐시 재사용).
 
-    CSRF는 브라우저가 자동으로 실어 보내는 Cookie(=ambient authority)를 노리는
-    공격이다 — 세션 Cookie로 인증된 요청에만 의미가 있고, X-User-Id Mock(헤더
-    기반, 브라우저가 자동으로 붙이지 않음)에는 CSRF 공격 자체가 성립하지 않는다.
-    그래서 세션 인증(request.state.session_id 존재)일 때만 검증하고, Mock
-    경로는 그대로 통과시킨다(Mock 자체는 이미 별도로 환경 게이트로 제한됨)."""
+    두 가지를 함께 강제한다(Sprint8 Commit8-2c, PM 승인사항):
+    1) Mock(X-User-Id) 인증 사용자는 CSRF Token 유무와 무관하게 상태변경
+       API에서 완전히 차단된다 — Mock은 세션이 없어 원래 CSRF 공격 자체가
+       성립하지 않지만, 개발·테스트 환경에서 실수로 Mock이 활성화된 채 실제
+       Write 경로(Sheets/GAS)에 도달하는 것을 구조적으로 막기 위한 별도 통제다.
+       이 판단은 request.state.auth_method(서버가 build_require_session_user에서
+       직접 설정, 클라이언트가 보낸 어떤 헤더·값도 신뢰하지 않음)만 근거로 한다.
+    2) 세션(Cookie) 인증 사용자는 기존과 동일하게 CSRF Token을 검증한다.
+    """
 
     def require_csrf(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+        auth_method = getattr(request.state, "auth_method", None)
+
+        if auth_method == "mock":
+            _audit_write_blocked(request, user, "MOCK_WRITE_BLOCKED", "MOCK_STATE_CHANGE_FORBIDDEN")
+            raise HTTPException(403, "Mock 인증으로는 상태변경 작업을 수행할 수 없습니다")
+
         session_id = getattr(request.state, "session_id", None)
         if session_id is None:
-            return user  # Mock 경로 — CSRF 대상 아님(세션 Cookie 자체가 없음)
+            # auth_method가 "session"도 "mock"도 아닌 미확인 상태 — 신뢰할 수 없으므로
+            # 안전한 쪽(차단)을 기본값으로 한다(Fail-Closed).
+            _audit_write_blocked(request, user, "MOCK_WRITE_BLOCKED", "UNVERIFIED_AUTH_METHOD")
+            raise HTTPException(403, "상태변경 작업을 수행할 수 없습니다")
 
         expected = getattr(request.state, "csrf_token", None)
         provided = request.headers.get(CSRF_HEADER_NAME)
         if expected is None or not csrf_token_matches(expected, provided):
-            data_dir = getattr(request.app.state, "cshsp_data_dir", None)
-            if data_dir:
-                store.init_schema(data_dir)
-                with store.connect(data_dir) as conn:
-                    store.append_auth_audit(
-                        conn, audit_id=f"AUD-AUTH-{uuid.uuid4().hex}",
-                        event_type="CSRF_VALIDATION_FAILED", actor_user_id=user.get("id"),
-                        request_id=request.headers.get("X-Request-Id"),
-                        route=str(request.url.path), result="FAILURE",
-                        reason_code="CSRF_MISMATCH", source_env=current_env(),
-                    )
+            _audit_write_blocked(request, user, "CSRF_VALIDATION_FAILED", "CSRF_MISMATCH")
             raise HTTPException(403, "CSRF 토큰이 유효하지 않습니다")
         return user
 

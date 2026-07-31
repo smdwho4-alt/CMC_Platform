@@ -60,6 +60,7 @@ import reservation_engine as engine  # noqa: E402
 import sheets_readonly_service as sheets  # noqa: E402
 import sheets_write_service as sheets_write  # noqa: E402
 from api_server import create_app  # noqa: E402
+from _step2_session_helper import ensure_session  # noqa: E402
 
 SANDBOX = Path(__file__).parent / "sandbox_sprint4_commit5_2_policy" / "data"
 if SANDBOX.parent.exists():
@@ -165,7 +166,13 @@ check("신규 승인 API 엔드포인트 추가 없음(기존 approve/reject 2�
 
 # ── 1. Backend 통합 테스트 ──
 client = TestClient(create_app(SANDBOX, include_agents=False))
-STAFF = {"X-User-Id": "USR-0002"}  # ROLE-STAFF: reservation:approve 보유
+STAFF = {"X-User-Id": "USR-0002"}  # ROLE-STAFF: reservation:approve 보유(GET 등 Mock 허용 대상 조회에 계속 사용)
+# Sprint8 Commit8-2c STEP2: 승인(approve)은 상태변경 API라 Mock이 차단된다(CSRF
+# 유무 무관, PM 승인사항). 실제 세션 로그인으로 전환해 정상 CSRF Token을 발급받는다.
+STAFF_CSRF = ensure_session(
+    client, SANDBOX, user_id="USR-0002", role_id="ROLE-STAFF",
+    display_name="QA STAFF", login_id="qa_step2_c52_staff",
+)
 
 _FAKE_DB: dict[str, dict] = {}
 _UPDATE_STATUS_CALLS: list[str] = []
@@ -196,7 +203,7 @@ def _audit_recs(entity_id: str) -> list[dict]:
 
 
 def _approve(no: str):
-    return client.post(f"/api/admin/reservations/{no}/approve", headers=STAFF)
+    return client.post(f"/api/admin/reservations/{no}/approve", headers=STAFF_CSRF)
 
 
 # (1) Program Mapping 성공 — Program.code 완전일치("SMART") → 정상 승인(200)

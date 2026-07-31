@@ -34,6 +34,22 @@ STAFF = {"X-User-Id": "USR-0002"}
 AI = {"X-User-Id": "USR-9000"}
 DIRECTOR = {"X-User-Id": "USR-0001"}
 
+# Sprint8 Commit8-2c STEP2: 승인/취소(상태변경)는 Mock이 차단된다. 이 파일은
+# client(Mock)를 조회·생성 등 다른 목적에 계속 광범위하게 쓰므로, 상태변경
+# 호출 전용의 별도 세션 client만 새로 만든다(메인 client에 세션 로그인을
+# 하면 이후 다른 Mock 기반 호출들이 전부 그 세션 신원으로 바뀌어버린다).
+from _step2_session_helper import ensure_session  # noqa: E402
+client_staff = TestClient(create_app(SANDBOX))
+STAFF_CSRF = ensure_session(
+    client_staff, SANDBOX, user_id="USR-0002", role_id="ROLE-STAFF",
+    display_name="QA STAFF", login_id="qa_step2_d_staff",
+)
+client_ai = TestClient(create_app(SANDBOX))
+AI_CSRF = ensure_session(
+    client_ai, SANDBOX, user_id="USR-9000", role_id="ROLE-AI-AGENT",
+    display_name="QA AI", login_id="qa_step2_d_ai",
+)
+
 results: list[tuple[str, str, str]] = []
 
 
@@ -91,13 +107,13 @@ check("POST /api/reservations (AI 신청)", r.status_code == 201
 slot = client.get("/api/slots?status=HOLD", headers=STAFF).json()
 check("신청 후 Slot HOLD", any(s["id"] == "SLOT-20260721-0900-A" for s in slot["records"]))
 
-check("AI 승인 차단 → 403", client.post(f"/api/reservations/{RID}/approve", headers=AI).status_code == 403)
-r = client.post(f"/api/reservations/{RID}/approve", headers=STAFF)
+check("AI 승인 차단 → 403", client_ai.post(f"/api/reservations/{RID}/approve", headers=AI_CSRF).status_code == 403)
+r = client_staff.post(f"/api/reservations/{RID}/approve", headers=STAFF_CSRF)
 check("직원 승인 → CONFIRMED", r.status_code == 200 and r.json()["reservation"]["status"] == "CONFIRMED")
 
-r = client.post(f"/api/reservations/{RID}/cancel", headers=STAFF, json={"reason": "QA"})
+r = client_staff.post(f"/api/reservations/{RID}/cancel", headers=STAFF_CSRF, json={"reason": "QA"})
 check("취소 → CANCELLED", r.status_code == 200 and r.json()["reservation"]["status"] == "CANCELLED")
-check("취소건 재승인 → 409", client.post(f"/api/reservations/{RID}/approve", headers=STAFF).status_code == 409)
+check("취소건 재승인 → 409", client_staff.post(f"/api/reservations/{RID}/approve", headers=STAFF_CSRF).status_code == 409)
 
 # ── 5. 검증 실패 응답 (422 + 대체 슬롯) ──
 dup = client.post("/api/reservations", headers=AI, json={**body, "patientId": "PT-2026-0001",

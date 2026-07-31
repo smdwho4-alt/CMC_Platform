@@ -31,6 +31,15 @@ client = TestClient(create_app(SANDBOX))
 STAFF = {"X-User-Id": "USR-0002"}
 SID = "CHAT-TEST-0001"
 
+# Sprint8 Commit8-2c STEP2: 승인(상태변경)은 Mock이 차단된다. 이 파일은 STAFF
+# 단일 역할만 쓰므로(다른 역할과 섞이지 않음), 메인 client를 그대로 세션
+# 로그인해도 안전하다.
+from _step2_session_helper import ensure_session  # noqa: E402
+STAFF_CSRF = ensure_session(
+    client, SANDBOX, user_id="USR-0002", role_id="ROLE-STAFF",
+    display_name="QA STAFF", login_id="qa_step2_f_staff",
+)
+
 results: list[tuple[str, str, str]] = []
 
 
@@ -95,7 +104,7 @@ check("Safety 차단 audit log 기록", len(sb) >= 1,
       f"{len(sb)}건, category={sb[0]['after']['category'] if sb else '-'}")
 
 # ── 6. 직원 승인 → 알림 PENDING → Worker 처리 ──
-r = client.post(f"/api/reservations/{RID}/approve", headers=STAFF)
+r = client.post(f"/api/reservations/{RID}/approve", headers=STAFF_CSRF)
 check("직원 승인 → CONFIRMED", r.status_code == 200 and r.json()["reservation"]["status"] == "CONFIRMED")
 ntf_pending = [n for n in loader.load_entity("Notification", SANDBOX)
                if n["status"] == "PENDING" and n.get("reservationId") == RID]
@@ -132,7 +141,11 @@ check("미인증 세션 문진 제출 차단", r_other.status_code == 403)
 r = client.get("/api/questionnaires?status=SUBMITTED", headers=STAFF)
 check("직원 문진 목록 조회 (마스킹 포함)", r.status_code == 200
       and any(q["id"] == QID and "****" in q["patientBirthMasked"] for q in r.json()["records"]))
-check("AI 계정 문진 목록 차단", client.get("/api/questionnaires",
+# client는 위에서 STAFF 세션으로 로그인해 Cookie를 갖고 있어(세션이 있으면 Mock
+# 헤더보다 항상 우선) 다른 신원(AI)을 Mock으로 흉내낼 수 없다 — 별도 Mock 전용
+# client로 검증한다.
+client_mock_ai = TestClient(create_app(SANDBOX))
+check("AI 계정 문진 목록 차단", client_mock_ai.get("/api/questionnaires",
       headers={"X-User-Id": "USR-9000"}).status_code == 403)
 r = client.post(f"/api/questionnaires/{QID}/review", headers=STAFF,
                 json={"decision": "REVIEWED", "note": "이상 없음"})

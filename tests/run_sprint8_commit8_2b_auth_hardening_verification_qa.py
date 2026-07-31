@@ -9,20 +9,18 @@ CSRF 예외 재평가)을 코드로 재현·기록하는 순수 추가 테스트
 이 파일은 두 가지 목적을 가진다.
 1) Fail-Closed 정책(운영환경 Mock 완전 차단, Staging 기본 차단, 설정 누락 시
    차단, 인증 장애 시 자동전환 없음)이 실제로 동작하는지 확인한다.
-2) **알려진 잔여 위험을 있는 그대로 기록한다**: Mock 인증이 허용된 상태에서는
-   상태변경(승인/거절/상담상태변경) API가 CSRF 검증 없이 그대로 실행되며,
-   Sheets Write 경로를 구조적으로 차단하는 장치가 없다. 이 동작은 Commit8-2가
-   새로 만든 것이 아니라 Mock 인증 자체가 원래부터 가진 전권(Commit8-2 이전
-   에도 Mock은 무제한 쓰기 권한을 가졌음)이 그대로 남아있는 것이지만, PM의
-   위협 시나리오 판정 기준(Mock이 CSRF 없이 상태변경 가능 + Write 경로 미차단
-   = 중대한 위험)에 따라 이 사실을 은폐하지 않고 테스트로 고정해 추적한다.
-   **이 테스트는 "안전하다"를 주장하지 않는다** — 현재 동작을 기록하고, 이
-   동작이 향후 의도치 않게 달라지면(예: 더 위험해지면) 실패하도록 하는
-   회귀 고정(pin) 목적이다. 실제 차단 여부에 대한 최종 결정은 PM의 몫이다.
+2) [Sprint8 Commit8-2c STEP1/STEP2로 갱신] 원래 이 섹션(MOCKCSRF-01~03)은
+   "Mock 인증이 CSRF 없이 상태변경 API를 그대로 통과한다"는 **당시의 알려진
+   취약점을 있는 그대로 고정(pin)해 기록**하는 테스트였다. Commit8-2c STEP1에서
+   이 취약점을 실제로 차단하는 코드(`src/auth/routes_auth.py::build_require_csrf`가
+   Mock 경로를 CSRF Token 유무와 무관하게 403으로 거부)를 구현했으므로, 이제는
+   반대로 **"Mock이 상태변경 API에서 실제로 차단되는지"를 검증하는 보안 회귀
+   테스트**로 의미를 바꾼다(PM 지시: 취약성 고정 테스트 → 보안 차단 회귀 테스트).
+   상세한 Write 부작용(Fake Adapter 호출 0회 등) 검증은
+   `run_sprint8_commit8_2c_mock_write_block_qa.py`가 전담하며, 이 파일은
+   Fail-Closed 환경변수 시나리오와 함께 재확인하는 역할만 유지한다.
 
-GAS/Sheets 실호출 없음(CSHSP_GAS_WEBAPP_URL 미설정 상태로 검증 — 승인/거절
-요청이 GAS 설정 부재로 503에서 멈추는 것 자체가 "CSRF 검증을 통과해 비즈니스
-로직까지 도달했다"는 사실의 증거로 사용된다).
+GAS/Sheets 실호출 없음(CSHSP_GAS_WEBAPP_URL 미설정 상태로 검증).
 """
 from __future__ import annotations
 
@@ -53,6 +51,12 @@ _users = loader.load_entity("User", SANDBOX)
 _staff = next(u for u in _users if u.get("roleId") == "ROLE-STAFF")
 STAFF_ID = _staff["id"]
 STAFF_HDR = {"X-User-Id": STAFF_ID}
+# 상담 상태변경(crm:manage)은 STAFF가 아니라 CRM 역할이 보유한 권한이다 — MOCKCSRF-03이
+# "권한 부족(RBAC)"이 아니라 "Mock 자체가 차단됨"을 정확히 검증하려면 권한이 충분한
+# 역할로 시도해야 한다(그래야 RBAC를 통과하고 CSRF/Mock 관문에서 막히는지 확정 가능).
+_crm = next(u for u in _users if u.get("roleId") == "ROLE-CRM")
+CRM_ID = _crm["id"]
+CRM_HDR = {"X-User-Id": CRM_ID}
 
 results: list[tuple[str, str, str]] = []
 
@@ -128,22 +132,27 @@ else:
 
 c_dev = _client({"CSHSP_ENV": "development", "CSHSP_ALLOW_MOCK_AUTH": "1"})
 
+# Sprint8 Commit8-2c STEP1로 차단 구현됨 — 이제 Mock은 CSRF Token 유무와 무관하게
+# 상태변경 API에서 403으로 거부되는지를 검증한다(취약성 고정 → 보안 차단 회귀).
 r_approve = c_dev.post("/api/admin/reservations/RSV-HARDENING-FAKE/approve", headers=STAFF_HDR)
-check("MOCKCSRF-01 [기록됨/알려진 위험] Mock+CSRF Token 없이 승인 요청이 CSRF 관문에서 막히지 않고 "
-      "비즈니스 로직까지 도달함(403이 아니라 GAS 설정 부재 503로 실패 — 즉 CSRF는 통과했다는 증거)",
-      r_approve.status_code == 503, str(r_approve.status_code))
+check("MOCKCSRF-01 [Commit8-2c STEP1로 차단됨] Mock+CSRF Token 없이 승인 요청 → 403(더 이상 503 통과 아님)",
+      r_approve.status_code == 403, str(r_approve.status_code))
 
 r_reject = c_dev.post("/api/admin/reservations/RSV-HARDENING-FAKE/reject", headers=STAFF_HDR,
                        json={"reason": "hardening test"})
-check("MOCKCSRF-02 [기록됨/알려진 위험] Mock+CSRF Token 없이 거절 요청도 동일하게 CSRF 관문 통과",
-      r_reject.status_code == 503, str(r_reject.status_code))
+check("MOCKCSRF-02 [Commit8-2c STEP1로 차단됨] Mock+CSRF Token 없이 거절 요청 → 403",
+      r_reject.status_code == 403, str(r_reject.status_code))
 
+# CRM_HDR 사용(crm:manage 보유) — RBAC를 통과시켜서 이 403이 권한 부족이 아니라
+# 순수하게 Mock 차단(auth_method=="mock") 때문임을 명확히 한다. 실제 라우트의
+# Depends 순서는 RBAC(require_consultation_manage)가 먼저이므로, 권한이 부족한
+# 역할로 시도하면 RBAC 403과 섞여 정확한 검증이 안 된다.
 r_status = c_dev.post("/api/admin/consultations/CONSULT-HARDENING-FAKE/status",
-                       headers={**STAFF_HDR, "Content-Type": "application/json"},
+                       headers={**CRM_HDR, "Content-Type": "application/json"},
                        json={"status": "IN_PROGRESS"})
-check("MOCKCSRF-03 Mock+CSRF Token 없는 상담 상태변경 요청도 CSRF 관문 통과(403 아님, 권한거부 403은 별개 사유)",
-      r_status.status_code != 403 or "crm:manage" in r_status.text,
-      f"{r_status.status_code} {r_status.text[:100]}")
+check("MOCKCSRF-03 [Commit8-2c STEP1로 차단됨] Mock(권한은 충분, CRM)+CSRF Token 없는 "
+      "상담 상태변경 요청 → 403(RBAC 통과 후 Mock 차단 확인, 권한부족 403과 구분됨)",
+      r_status.status_code == 403, str(r_status.status_code))
 
 # 세션(Cookie) 인증 경로는 동일 조건에서 CSRF가 실제로 차단하는지 대조 확인
 auth_service.create_user(
@@ -157,9 +166,15 @@ r_sess_no_csrf = c_sess.post("/api/admin/reservations/RSV-HARDENING-FAKE/approve
 check("MOCKCSRF-04 대조군: 세션(Cookie) 경로는 동일 요청이 CSRF에서 실제로 차단됨(403)",
       r_sess_no_csrf.status_code == 403, str(r_sess_no_csrf.status_code))
 
-check("MOCKCSRF-05 결론: CSRF 예외는 Mock 경로에만 적용되고 세션 경로에는 적용되지 않음이 코드 동작으로 확인됨"
-      "(§CSRF 적용범위 설계와 일치, 단 Mock의 Write 노출 자체는 별도 결정 필요 — Decision Required)",
-      True, "설계 의도와 실측 동작 일치 확인")
+# Sprint8 Commit8-2c STEP1로 Mock의 상태변경 접근 자체가 차단되면서 이 결론도
+# 갱신됐다: 이제는 Mock 경로(auth_method=="mock")와 세션 경로 둘 다 상태변경
+# API에서 차단되지만 그 사유가 다르다 — Mock은 auth_method 판정만으로 무조건
+# 403(§MOCKCSRF-01~03), 세션은 실제 CSRF Token 불일치일 때만 403(§MOCKCSRF-04).
+# 정상 세션+정상 CSRF+적정 권한 조합만 최종적으로 통과한다(run_sprint8_commit8_2c_
+# mock_write_block_qa.py 시나리오 13이 이 마지막 조합을 별도로 검증한다).
+check("MOCKCSRF-05 결론: Mock은 무조건 차단, 세션은 CSRF 불일치 시에만 차단 — "
+      "두 통제가 서로 다른 사유로 동작하며 둘 다 정상 동작함을 코드로 확인",
+      True, "Commit8-2c STEP1 구현과 실측 동작 일치 확인")
 
 
 shutil.rmtree(SANDBOX.parent)

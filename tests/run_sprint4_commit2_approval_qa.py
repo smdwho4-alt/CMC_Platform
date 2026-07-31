@@ -91,9 +91,31 @@ for k, v in (("예약접수", "REQUESTED"), ("예약확정", "CONFIRMED"), ("검
 # ── 1. Backend 통합 테스트(TestClient, GAS monkeypatch) ──
 client = TestClient(create_app(SANDBOX, include_agents=False))
 
-STAFF = {"X-User-Id": "USR-0002"}      # ROLE-STAFF: reservation:approve 보유
-DIRECTOR = {"X-User-Id": "USR-0001"}   # ROLE-DIRECTOR: reservation:approve 미보유
+STAFF = {"X-User-Id": "USR-0002"}      # ROLE-STAFF: reservation:approve 보유(client의 조회용 Mock 유지)
+DIRECTOR = {"X-User-Id": "USR-0001"}   # ROLE-DIRECTOR: reservation:approve 미보유(client의 _audit_count_for() Mock 유지)
 CRM_USER = {"X-User-Id": "USR-0003"}   # ROLE-CRM: reservation:approve 미보유
+
+# Sprint8 Commit8-2c STEP2: 승인/거절(상태변경)은 Mock이 차단된다. 조회(_audit_count_for
+# 등)는 계속 Mock(client, DIRECTOR)을 쓰되, 상태변경 호출은 역할별 별도 세션 client로
+# 분리한다 — 한 client에서 세션 로그인을 하면 이후 Mock 헤더보다 세션 Cookie가 항상
+# 우선돼 다른 역할을 Mock으로 흉내내려는 호출이 실제로는 로그인된 신원으로 나간다.
+from _step2_session_helper import ensure_session  # noqa: E402
+client_staff = TestClient(create_app(SANDBOX, include_agents=False))
+STAFF_CSRF = ensure_session(
+    client_staff, SANDBOX, user_id="USR-0002", role_id="ROLE-STAFF",
+    display_name="QA STAFF", login_id="qa_step2_c2_staff",
+)
+client_director_approve = TestClient(create_app(SANDBOX, include_agents=False))
+DIRECTOR_CSRF = ensure_session(
+    client_director_approve, SANDBOX, user_id="USR-0001", role_id="ROLE-DIRECTOR",
+    display_name="QA DIRECTOR", login_id="qa_step2_c2_director",
+)
+client_crm = TestClient(create_app(SANDBOX, include_agents=False))
+CRM_CSRF = ensure_session(
+    client_crm, SANDBOX, user_id="USR-0003", role_id="ROLE-CRM",
+    display_name="QA CRM", login_id="qa_step2_c2_crm",
+)
+client_noauth = TestClient(create_app(SANDBOX, include_agents=False))
 
 _FAKE_DB: dict[str, dict] = {}
 
@@ -133,14 +155,14 @@ def _audit_count_for(no: str) -> int:
 # 1) 예약접수 → 예약확정 성공
 sheets_write.update_status = _fake_update_status
 _reset_fake_reservation("20260728-1001", "예약접수")
-r = client.post("/api/admin/reservations/20260728-1001/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260728-1001/approve", headers=STAFF_CSRF)
 check("(1) 예약접수→예약확정 성공(200)", r.status_code == 200, str(r.status_code))
 check("(1) 응답에 status=예약확정 포함",
       r.status_code == 200 and r.json().get("data", {}).get("status") == "예약확정")
 
 # 2) 예약접수 → 거절 성공
 _reset_fake_reservation("20260728-1002", "예약접수")
-r = client.post("/api/admin/reservations/20260728-1002/reject", headers=STAFF,
+r = client_staff.post("/api/admin/reservations/20260728-1002/reject", headers=STAFF_CSRF,
                  json={"reason": "예약 가능 인원 초과"})
 check("(2) 예약접수→거절 성공(200)", r.status_code == 200, str(r.status_code))
 check("(2) 응답에 status=거절 포함",
@@ -148,55 +170,55 @@ check("(2) 응답에 status=거절 포함",
 
 # 3) 거절 사유 누락 422 (공백만 입력 포함)
 _reset_fake_reservation("20260728-1003", "예약접수")
-r = client.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF, json={"reason": "   "})
+r = client_staff.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF_CSRF, json={"reason": "   "})
 check("(3) 거절 사유 공백만 입력 → 422", r.status_code == 422, str(r.status_code))
-r_missing = client.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF, json={})
+r_missing = client_staff.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF_CSRF, json={})
 check("(3) 거절 사유 필드 자체 누락 → 422", r_missing.status_code == 422, str(r_missing.status_code))
-r_pii = client.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF,
+r_pii = client_staff.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF_CSRF,
                      json={"reason": "고객 연락처 010-1234-5678로 확인 요망"})
 check("(3) 거절 사유에 전화번호 패턴 포함 → 422", r_pii.status_code == 422, str(r_pii.status_code))
-r_short = client.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF, json={"reason": "ا"})
+r_short = client_staff.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF_CSRF, json={"reason": "ا"})
 check("(3) 거절 사유 최소 길이 미달(1자) → 422", r_short.status_code == 422, str(r_short.status_code))
-r_long = client.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF, json={"reason": "가" * 201})
+r_long = client_staff.post("/api/admin/reservations/20260728-1003/reject", headers=STAFF_CSRF, json={"reason": "가" * 201})
 check("(3) 거절 사유 최대 길이 초과(201자) → 422", r_long.status_code == 422, str(r_long.status_code))
 
 # 4) 존재하지 않는 예약 404
-r = client.post("/api/admin/reservations/NOPE-0000/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/NOPE-0000/approve", headers=STAFF_CSRF)
 check("(4) 존재하지 않는 예약번호 승인 → 404", r.status_code == 404, str(r.status_code))
-r = client.post("/api/admin/reservations/NOPE-0000/reject", headers=STAFF, json={"reason": "사유"})
+r = client_staff.post("/api/admin/reservations/NOPE-0000/reject", headers=STAFF_CSRF, json={"reason": "사유"})
 check("(4) 존재하지 않는 예약번호 거절 → 404", r.status_code == 404, str(r.status_code))
 
 # 5) 권한 없는 역할 403 (+ 헤더 없음 401 재확인 — Authentication→RoleCheck 순서)
 _reset_fake_reservation("20260728-1005", "예약접수")
-r = client.post("/api/admin/reservations/20260728-1005/approve", headers=DIRECTOR)
+r = client_director_approve.post("/api/admin/reservations/20260728-1005/approve", headers=DIRECTOR_CSRF)
 check("(5) DIRECTOR(reservation:approve 미보유) 승인 시도 → 403", r.status_code == 403, str(r.status_code))
-r = client.post("/api/admin/reservations/20260728-1005/approve", headers=CRM_USER)
+r = client_crm.post("/api/admin/reservations/20260728-1005/approve", headers=CRM_CSRF)
 check("(5) CRM(reservation:approve 미보유) 승인 시도 → 403", r.status_code == 403, str(r.status_code))
-r = client.post("/api/admin/reservations/20260728-1005/approve")
+r = client_noauth.post("/api/admin/reservations/20260728-1005/approve")
 check("(5) 헤더 없음 → 401(RoleCheck 이전 인증 단계에서 차단)", r.status_code == 401, str(r.status_code))
 
 # 6) 예약확정 재승인 409
 _reset_fake_reservation("20260728-1006", "예약확정")
-r = client.post("/api/admin/reservations/20260728-1006/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260728-1006/approve", headers=STAFF_CSRF)
 check("(6) 이미 예약확정인 건 재승인 → 409", r.status_code == 409, str(r.status_code))
 
 # 7) 예약확정 직접 거절 409
 _reset_fake_reservation("20260728-1007", "예약확정")
-r = client.post("/api/admin/reservations/20260728-1007/reject", headers=STAFF, json={"reason": "테스트 사유"})
+r = client_staff.post("/api/admin/reservations/20260728-1007/reject", headers=STAFF_CSRF, json={"reason": "테스트 사유"})
 check("(7) 예약확정 상태를 직접 거절 시도 → 409", r.status_code == 409, str(r.status_code))
 
 # 8) 거절 재처리 409
 _reset_fake_reservation("20260728-1008", "거절")
-r = client.post("/api/admin/reservations/20260728-1008/reject", headers=STAFF, json={"reason": "재시도"})
+r = client_staff.post("/api/admin/reservations/20260728-1008/reject", headers=STAFF_CSRF, json={"reason": "재시도"})
 check("(8) 이미 거절된 건 재거절 시도 → 409", r.status_code == 409, str(r.status_code))
-r = client.post("/api/admin/reservations/20260728-1008/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260728-1008/approve", headers=STAFF_CSRF)
 check("(8) 이미 거절된 건 승인 시도 → 409(종결 상태에서 전환 불가)", r.status_code == 409, str(r.status_code))
 
 # 9) GAS 실패 시 상태·Audit 일관성 + 11) 실패 시 성공 Audit 미생성
 sheets_write.update_status = _fake_update_status_gas_error
 _reset_fake_reservation("20260728-1009", "예약접수")
 before_count = _audit_count_for("20260728-1009")
-r = client.post("/api/admin/reservations/20260728-1009/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260728-1009/approve", headers=STAFF_CSRF)
 check("(9) GAS 오류 시 502 반환", r.status_code == 502, str(r.status_code))
 check("(9) GAS 오류 시 로컬 상태(Fake Sheets)도 변경되지 않음(일관성)",
       _FAKE_DB["20260728-1009"]["status"] == "예약접수")
@@ -207,7 +229,7 @@ sheets_write.update_status = _fake_update_status  # 원복
 
 # 10) 성공 시 Audit 생성(예약번호/이전상태/변경상태/처리자/처리시각/거절사유)
 _reset_fake_reservation("20260728-1010", "예약접수")
-client.post("/api/admin/reservations/20260728-1010/approve", headers=STAFF)
+client_staff.post("/api/admin/reservations/20260728-1010/approve", headers=STAFF_CSRF)
 r = client.get("/api/audit-logs", headers=DIRECTOR)
 recs = [x for x in r.json().get("records", []) if x.get("entityId") == "20260728-1010"]
 check("(10) 승인 성공 시 Audit 1건 생성", len(recs) == 1, str(len(recs)))
@@ -221,7 +243,7 @@ if recs:
           and (rec.get("after") or {}).get("status") == "예약확정")
 
 _reset_fake_reservation("20260728-1011", "예약접수")
-client.post("/api/admin/reservations/20260728-1011/reject", headers=STAFF, json={"reason": "정원 초과로 거절"})
+client_staff.post("/api/admin/reservations/20260728-1011/reject", headers=STAFF_CSRF, json={"reason": "정원 초과로 거절"})
 r = client.get("/api/audit-logs", headers=DIRECTOR)
 recs = [x for x in r.json().get("records", []) if x.get("entityId") == "20260728-1011"]
 check("(10) 거절 성공 시 Audit 1건 생성", len(recs) == 1, str(len(recs)))

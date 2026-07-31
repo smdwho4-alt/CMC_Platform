@@ -277,19 +277,19 @@ def create_app(data_dir: str | Path | None = None, include_agents: bool = True,
         return result
 
     @app.post("/api/reservations/{rid}/approve")
-    def approve(rid: str, user=Depends(require_user)):
+    def approve(rid: str, user=Depends(require_user), _csrf=Depends(require_csrf)):
         return {"success": True, "reservation": run_engine(engine.approve_reservation, rid, user["id"])}
 
     @app.post("/api/reservations/{rid}/reject")
-    def reject(rid: str, body: ReasonBody, user=Depends(require_user)):
+    def reject(rid: str, body: ReasonBody, user=Depends(require_user), _csrf=Depends(require_csrf)):
         return {"success": True, "reservation": run_engine(engine.reject_reservation, rid, user["id"], body.reason)}
 
     @app.post("/api/reservations/{rid}/cancel")
-    def cancel(rid: str, body: ReasonBody, user=Depends(require_user)):
+    def cancel(rid: str, body: ReasonBody, user=Depends(require_user), _csrf=Depends(require_csrf)):
         return {"success": True, "reservation": run_engine(engine.cancel_reservation, rid, user["id"], body.reason)}
 
     @app.post("/api/reservations/{rid}/change")
-    def change(rid: str, body: ChangeBody, user=Depends(require_user)):
+    def change(rid: str, body: ChangeBody, user=Depends(require_user), _csrf=Depends(require_csrf)):
         result = run_engine(engine.change_reservation, rid,
                             body.newSlotId, body.newDate, body.newTime, user["id"], body.reason)
         if not result["success"]:
@@ -298,12 +298,12 @@ def create_app(data_dir: str | Path | None = None, include_agents: bool = True,
         return result
 
     @app.post("/api/reservations/{rid}/no-show")
-    def no_show(rid: str, user=Depends(require_user)):
+    def no_show(rid: str, user=Depends(require_user), _csrf=Depends(require_csrf)):
         need_perm(user, "reservation:change")
         return {"success": True, "reservation": run_engine(engine.mark_no_show, rid, user["id"])}
 
     @app.post("/api/reservations/{rid}/complete")
-    def complete(rid: str, user=Depends(require_user)):
+    def complete(rid: str, user=Depends(require_user), _csrf=Depends(require_csrf)):
         need_perm(user, "reservation:change")
         return {"success": True, "reservation": run_engine(engine.complete_reservation, rid, user["id"])}
 

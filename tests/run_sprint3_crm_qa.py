@@ -75,6 +75,27 @@ STAFF = {"X-User-Id": "USR-0002"}
 DIRECTOR = {"X-User-Id": "USR-0001"}
 CRM_USER = {"X-User-Id": "USR-0003"}
 
+# Sprint8 Commit8-2c STEP2: 상담 상태변경(POST .../status)은 Mock이 차단된다.
+# 조회(GET)는 계속 Mock(client)을 쓰되, 상태변경 호출은 역할별 별도 세션
+# client로 분리한다(한 client에서 세션 로그인하면 이후 Mock 헤더보다 세션
+# Cookie가 항상 우선돼 다른 역할을 Mock으로 흉내낼 수 없게 되기 때문).
+from _step2_session_helper import ensure_session  # noqa: E402
+client_staff = TestClient(create_app(SANDBOX, include_agents=False))
+STAFF_CSRF = ensure_session(
+    client_staff, SANDBOX, user_id="USR-0002", role_id="ROLE-STAFF",
+    display_name="QA STAFF", login_id="qa_step2_crm_staff",
+)
+client_director = TestClient(create_app(SANDBOX, include_agents=False))
+DIRECTOR_CSRF = ensure_session(
+    client_director, SANDBOX, user_id="USR-0001", role_id="ROLE-DIRECTOR",
+    display_name="QA DIRECTOR", login_id="qa_step2_crm_director",
+)
+client_crm = TestClient(create_app(SANDBOX, include_agents=False))
+CRM_CSRF = ensure_session(
+    client_crm, SANDBOX, user_id="USR-0003", role_id="ROLE-CRM",
+    display_name="QA CRM", login_id="qa_step2_crm_crm",
+)
+
 check("헤더 없이 조회 → 401", client.get("/api/admin/consultations").status_code == 401)
 check("STAFF(crm:manage/log/audit:view 없음) → 403",
       client.get("/api/admin/consultations", headers=STAFF).status_code == 403)
@@ -105,25 +126,25 @@ check("channel 필터(AI_CHAT)", len(client.get("/api/admin/consultations", para
 
 # ── 3. POST /api/admin/consultations/{id}/status — 상태전이 검증 ──
 check("STAFF(crm:manage 없음) → 상태변경 403",
-      client.post("/api/admin/consultations/CRM-0002/status", json={"status": "IN_PROGRESS"}, headers=STAFF).status_code == 403)
+      client_staff.post("/api/admin/consultations/CRM-0002/status", json={"status": "IN_PROGRESS"}, headers=STAFF_CSRF).status_code == 403)
 check("DIRECTOR(crm:manage 없음, 조회는 되지만 관리는 불가) → 상태변경 403",
-      client.post("/api/admin/consultations/CRM-0002/status", json={"status": "IN_PROGRESS"}, headers=DIRECTOR).status_code == 403)
+      client_director.post("/api/admin/consultations/CRM-0002/status", json={"status": "IN_PROGRESS"}, headers=DIRECTOR_CSRF).status_code == 403)
 
 check("허용되지 않은 상태값(DELETED) → 400",
-      client.post("/api/admin/consultations/CRM-0002/status", json={"status": "DELETED"}, headers=CRM_USER).status_code == 400)
+      client_crm.post("/api/admin/consultations/CRM-0002/status", json={"status": "DELETED"}, headers=CRM_CSRF).status_code == 400)
 check("존재하지 않는 상담 ID → 404",
-      client.post("/api/admin/consultations/CRM-9999/status", json={"status": "IN_PROGRESS"}, headers=CRM_USER).status_code == 404)
+      client_crm.post("/api/admin/consultations/CRM-9999/status", json={"status": "IN_PROGRESS"}, headers=CRM_CSRF).status_code == 404)
 check("역행 전이(IN_PROGRESS→OPEN) 거부 → 409",
-      client.post("/api/admin/consultations/CRM-0003/status", json={"status": "OPEN"}, headers=CRM_USER).status_code == 409)
+      client_crm.post("/api/admin/consultations/CRM-0003/status", json={"status": "OPEN"}, headers=CRM_CSRF).status_code == 409)
 check("건너뛰기 전이(OPEN→CLOSED, IN_PROGRESS 생략) 거부 → 409",
-      client.post("/api/admin/consultations/CRM-0002/status", json={"status": "CLOSED"}, headers=CRM_USER).status_code == 409)
+      client_crm.post("/api/admin/consultations/CRM-0002/status", json={"status": "CLOSED"}, headers=CRM_CSRF).status_code == 409)
 check("종결 상태(CLOSED)에서 추가 전이 거부 → 409",
-      client.post("/api/admin/consultations/CRM-0001/status", json={"status": "CLOSED"}, headers=CRM_USER).status_code == 409)
+      client_crm.post("/api/admin/consultations/CRM-0001/status", json={"status": "CLOSED"}, headers=CRM_CSRF).status_code == 409)
 check("유효하지 않은 handledBy → 400",
-      client.post("/api/admin/consultations/CRM-0002/status", json={"status": "IN_PROGRESS", "handledBy": "USR-XXXX"}, headers=CRM_USER).status_code == 400)
+      client_crm.post("/api/admin/consultations/CRM-0002/status", json={"status": "IN_PROGRESS", "handledBy": "USR-XXXX"}, headers=CRM_CSRF).status_code == 400)
 
-r_ok = client.post("/api/admin/consultations/CRM-0002/status",
-                    json={"status": "IN_PROGRESS", "handledBy": "USR-0003"}, headers=CRM_USER)
+r_ok = client_crm.post("/api/admin/consultations/CRM-0002/status",
+                    json={"status": "IN_PROGRESS", "handledBy": "USR-0003"}, headers=CRM_CSRF)
 check("정상 순차 전이(OPEN→IN_PROGRESS) → 200", r_ok.status_code == 200, str(r_ok.status_code))
 check("응답에 변경된 status 반영", r_ok.json()["data"]["status"] == "IN_PROGRESS")
 check("응답에 handledBy 반영", r_ok.json()["data"]["handledBy"] == "USR-0003")
@@ -135,7 +156,7 @@ _persisted_rec = next(r for r in persisted["records"] if r["id"] == "CRM-0002")
 check("샌드박스 crm.json에 실제로 저장됨", _persisted_rec["status"] == "IN_PROGRESS", str(_persisted_rec["status"]))
 
 # 연쇄 전이: IN_PROGRESS → CLOSED도 정상 동작해야 함
-r_ok2 = client.post("/api/admin/consultations/CRM-0002/status", json={"status": "CLOSED"}, headers=CRM_USER)
+r_ok2 = client_crm.post("/api/admin/consultations/CRM-0002/status", json={"status": "CLOSED"}, headers=CRM_CSRF)
 check("연쇄 전이(IN_PROGRESS→CLOSED) → 200", r_ok2.status_code == 200)
 
 

@@ -102,8 +102,24 @@ check("신규 승인 API 엔드포인트 추가 없음(기존 approve/reject 2�
 
 # ── 1. Backend 통합 테스트 ──
 client = TestClient(create_app(SANDBOX, include_agents=False))
-STAFF = {"X-User-Id": "USR-0002"}   # ROLE-STAFF: reservation:approve 보유
-DIRECTOR = {"X-User-Id": "USR-0001"}  # 미보유
+STAFF = {"X-User-Id": "USR-0002"}   # ROLE-STAFF: reservation:approve 보유(client의 조회용 Mock은 유지)
+DIRECTOR = {"X-User-Id": "USR-0001"}  # 미보유(client의 _audit_recs() 조회용 Mock은 유지)
+# Sprint8 Commit8-2c STEP2: 승인/거절(상태변경)은 Mock이 차단된다. 조회(_audit_recs
+# 등)는 계속 Mock(client, DIRECTOR)을 쓰되, 상태변경 호출만 별도 세션 client로
+# 분리한다 — 같은 client에서 세션 로그인을 하면 이후 Mock 헤더보다 세션 Cookie가
+# 항상 우선돼 _audit_recs()의 DIRECTOR Mock 조회가 실제로는 다른 신원으로 나가는
+# 문제가 생기기 때문이다.
+from _step2_session_helper import ensure_session  # noqa: E402
+client_staff = TestClient(create_app(SANDBOX, include_agents=False))
+STAFF_CSRF = ensure_session(
+    client_staff, SANDBOX, user_id="USR-0002", role_id="ROLE-STAFF",
+    display_name="QA STAFF", login_id="qa_step2_c3_staff",
+)
+client_director = TestClient(create_app(SANDBOX, include_agents=False))
+DIRECTOR_CSRF = ensure_session(
+    client_director, SANDBOX, user_id="USR-0001", role_id="ROLE-DIRECTOR",
+    display_name="QA DIRECTOR", login_id="qa_step2_c3_director",
+)
 
 _FAKE_DB: dict[str, dict] = {}
 
@@ -142,7 +158,7 @@ def _audit_recs(entity_id: str) -> list[dict]:
 _reset_slots()
 sheets_write.update_status = _fake_update_status_ok
 _reset_reservation("20260804-0001", "예약접수", "2026-08-04", "09:00")
-r = client.post("/api/admin/reservations/20260804-0001/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260804-0001/approve", headers=STAFF_CSRF)
 check("(1) Slot 존재 + 승인 성공(200)", r.status_code == 200, str(r.status_code))
 check("(5) Slot 점유 반영(reservedCount 1, capacity 1 → FULL)",
       _slot_state("SLOT-QA-0900-A") == (1, "FULL"), str(_slot_state("SLOT-QA-0900-A")))
@@ -153,7 +169,7 @@ check("응답에 slotId 포함", r.json().get("data", {}).get("slotId") == "SLOT
 # 분류되어 routes_admin_portal.py가 차단하지 않고 그대로 통과시킨다 — 아래 기존
 # Commit3A 로직이 이 시나리오의 최종 코드(SLOT_FULL)를 그대로 생성한다.
 _reset_reservation("20260804-0002", "예약접수", "2026-08-04", "09:00")
-r = client.post("/api/admin/reservations/20260804-0002/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260804-0002/approve", headers=STAFF_CSRF)
 check("(3) Capacity FULL → 409", r.status_code == 409, str(r.status_code))
 body = r.json()
 check("(3) 409 code=SLOT_FULL", body.get("detail", {}).get("code") == "SLOT_FULL", str(body))
@@ -162,17 +178,17 @@ check("(3) FULL 재시도 후에도 정원 초과 점유 없음(reservedCount �
 
 # (2) Slot 없음
 _reset_reservation("20260804-0003", "예약접수", "2026-08-04", "23:45")
-r = client.post("/api/admin/reservations/20260804-0003/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260804-0003/approve", headers=STAFF_CSRF)
 check("(2) 매칭 Slot 없음 → 409", r.status_code == 409, str(r.status_code))
 check("(2) 409 code=SLOT_NOT_AVAILABLE", r.json().get("detail", {}).get("code") == "SLOT_NOT_AVAILABLE")
 
 # (4) Capacity Available(정원 2인 Slot, 2건 연속 승인 성공)
 _reset_reservation("20260804-0004", "예약접수", "2026-08-04", "10:00")
-r = client.post("/api/admin/reservations/20260804-0004/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260804-0004/approve", headers=STAFF_CSRF)
 check("(4) 정원 여유 Slot 승인 성공(1/2)", r.status_code == 200, str(r.status_code))
 check("(4) Slot 상태 AVAILABLE 유지(1/2)", _slot_state("SLOT-QA-1000-A") == (1, "AVAILABLE"))
 _reset_reservation("20260804-0005", "예약접수", "2026-08-04", "10:00")
-r = client.post("/api/admin/reservations/20260804-0005/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260804-0005/approve", headers=STAFF_CSRF)
 check("(4) 정원 여유 Slot 승인 성공(2/2, 정원 도달)", r.status_code == 200, str(r.status_code))
 check("(4) 정원 도달 시 FULL 전환", _slot_state("SLOT-QA-1000-A") == (2, "FULL"))
 
@@ -181,7 +197,7 @@ _reset_slots()  # SLOT-QA-0900-A: capacity 1, reservedCount 0으로 초기화
 sheets_write.update_status = _fake_update_status_fail
 _reset_reservation("20260804-0006", "예약접수", "2026-08-04", "09:00")
 before = _audit_recs("20260804-0006")
-r = client.post("/api/admin/reservations/20260804-0006/approve", headers=STAFF)
+r = client_staff.post("/api/admin/reservations/20260804-0006/approve", headers=STAFF_CSRF)
 check("(7) Sheets 쓰기 실패 → 502", r.status_code == 502, str(r.status_code))
 check("(7) 502 code=SHEETS_WRITE_FAILED", r.json().get("detail", {}).get("code") == "SHEETS_WRITE_FAILED")
 check("(6) Sheets 실패 시 Slot이 롤백되어 다시 0/AVAILABLE",
@@ -198,7 +214,7 @@ check("(8) GAS 실패 시 RESERVATION_APPROVED Audit 생성되지 않음",
 sheets_write.update_status = _fake_update_status_ok
 _reset_slots()
 _reset_reservation("20260804-0007", "예약접수", "2026-08-04", "09:00")
-client.post("/api/admin/reservations/20260804-0007/approve", headers=STAFF)
+client_staff.post("/api/admin/reservations/20260804-0007/approve", headers=STAFF_CSRF)
 recs = [a for a in _audit_recs("20260804-0007") if a.get("action") == "RESERVATION_APPROVED"]
 check("(8) 승인 성공 시 RESERVATION_APPROVED Audit 생성", len(recs) == 1, str(len(recs)))
 if recs:
@@ -206,7 +222,7 @@ if recs:
 
 # (9) RBAC — 기존 reservation:approve 재사용 확인(신규 권한 문자열 없음)
 _reset_reservation("20260804-0008", "예약접수", "2026-08-04", "10:00")
-r = client.post("/api/admin/reservations/20260804-0008/approve", headers=DIRECTOR)
+r = client_director.post("/api/admin/reservations/20260804-0008/approve", headers=DIRECTOR_CSRF)
 check("(9) DIRECTOR(reservation:approve 미보유) → 403", r.status_code == 403, str(r.status_code))
 check("(9) 코드에 하드코딩된 역할명(ROLE-) 없이 permission 문자열만 사용",
       "roleId ==" not in _ROUTES_SRC.split("_reserve_slot_for_approval")[1].split("def _process_reservation_approval")[0])
@@ -226,8 +242,8 @@ _reset_slots()
 sheets_write.update_status = _fake_update_status_ok
 _reset_reservation("20260804-0009", "예약접수", "2026-08-04", "09:00")
 _reset_reservation("20260804-0010", "예약접수", "2026-08-04", "09:00")
-r1 = client.post("/api/admin/reservations/20260804-0009/approve", headers=STAFF)
-r2 = client.post("/api/admin/reservations/20260804-0010/approve", headers=STAFF)
+r1 = client_staff.post("/api/admin/reservations/20260804-0009/approve", headers=STAFF_CSRF)
+r2 = client_staff.post("/api/admin/reservations/20260804-0010/approve", headers=STAFF_CSRF)
 check("(12) 정원 1인 Slot에 순차 요청 시 하나만 성공", r1.status_code == 200 and r2.status_code == 409,
       f"{r1.status_code}, {r2.status_code}")
 check("(12) 정원 초과 점유 없음(reservedCount == capacity 정확히 유지)",
@@ -236,7 +252,7 @@ check("(12) 정원 초과 점유 없음(reservedCount == capacity 정확히 유�
 # 거절(reject)은 Slot을 소비하지 않음 — 회귀 확인
 _reset_slots()
 _reset_reservation("20260804-0011", "예약접수", "2026-08-04", "09:00")
-r = client.post("/api/admin/reservations/20260804-0011/reject", headers=STAFF, json={"reason": "정원 초과"})
+r = client_staff.post("/api/admin/reservations/20260804-0011/reject", headers=STAFF_CSRF, json={"reason": "정원 초과"})
 check("거절은 여전히 200(Slot 소비 없음)", r.status_code == 200, str(r.status_code))
 check("거절 시 Slot 상태 불변(0, AVAILABLE)", _slot_state("SLOT-QA-0900-A") == (0, "AVAILABLE"))
 

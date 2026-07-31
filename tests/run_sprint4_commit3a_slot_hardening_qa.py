@@ -45,6 +45,7 @@ import reservation_engine as engine  # noqa: E402
 import sheets_readonly_service as sheets  # noqa: E402
 import sheets_write_service as sheets_write  # noqa: E402
 from api_server import create_app  # noqa: E402
+from _step2_session_helper import ensure_session  # noqa: E402
 
 SANDBOX = Path(__file__).parent / "sandbox_sprint4_commit3a_hardening" / "data"
 if SANDBOX.parent.exists():
@@ -92,6 +93,12 @@ check("기존 API 오류 응답 구조({code, message}) 그대로 재사용, 신
 client = TestClient(create_app(SANDBOX, include_agents=False))
 STAFF = {"X-User-Id": "USR-0002"}
 DIRECTOR = {"X-User-Id": "USR-0001"}
+# Sprint8 Commit8-2c STEP2: 승인/거절은 상태변경 API라 Mock이 차단된다. client는
+# STAFF 세션으로 로그인해 이후 _approve()/거절 호출에 정상 CSRF Token을 쓴다.
+STAFF_CSRF = ensure_session(
+    client, SANDBOX, user_id="USR-0002", role_id="ROLE-STAFF",
+    display_name="QA STAFF", login_id="qa_step2_c3a_staff",
+)
 
 _SLOT_FIXTURES = [
     {"id": "SLOT-H-AVAIL1", "date": "2026-08-05", "time": "09:00", "capacity": 1},
@@ -158,7 +165,7 @@ sheets.get_reservation = _fake_get
 
 
 def _approve(no: str) -> object:
-    return client.post(f"/api/admin/reservations/{no}/approve", headers=STAFF)
+    return client.post(f"/api/admin/reservations/{no}/approve", headers=STAFF_CSRF)
 
 
 # (2) AVAILABLE Slot 승인 성공 — (1) 'OPEN' 상태는 Repository에 존재하지 않으므로
@@ -340,11 +347,23 @@ check("(19) 예약번호 배열에 중복이 생기지 않음",
       len(final_slot.get("sheetsReservationNos", [])) == len(set(final_slot.get("sheetsReservationNos", []))))
 
 # (20) RBAC 401/403 회귀
+# DIRECTOR는 별도 client(별도 Cookie Jar)로 세션 로그인한다 — 메인 client의
+# STAFF 세션과 섞이면 이후 STAFF 전용 호출(예약확정 재승인/거절)이 잘못된
+# 신원(DIRECTOR)으로 나가게 된다(세션 Cookie가 있으면 Mock 헤더보다 항상 우선).
 _reset_slots()
 _reset_reservation("20260805-0070", "2026-08-05", "09:00")
-r = client.post("/api/admin/reservations/20260805-0070/approve", headers=DIRECTOR)
-check("(20) DIRECTOR(reservation:approve 미보유) → 403 회귀 없음", r.status_code == 403)
-r = client.post("/api/admin/reservations/20260805-0070/approve")
+client_director = TestClient(create_app(SANDBOX, include_agents=False))
+DIRECTOR_CSRF = ensure_session(
+    client_director, SANDBOX, user_id="USR-0001", role_id="ROLE-DIRECTOR",
+    display_name="QA DIRECTOR", login_id="qa_step2_c3a_director",
+)
+r = client_director.post("/api/admin/reservations/20260805-0070/approve", headers=DIRECTOR_CSRF)
+check("(20) DIRECTOR(reservation:approve 미보유) → 403 회귀 없음(RBAC 사유, Mock 차단 사유 아님)",
+      r.status_code == 403, str(r.status_code) + " " + r.text[:120])
+# client는 위에서 STAFF 세션으로 로그인해 Cookie를 이미 갖고 있으므로, "인증 자체가
+# 없는" 시나리오는 Cookie가 없는 별도 client로 검증해야 정확하다.
+client_noauth = TestClient(create_app(SANDBOX, include_agents=False))
+r = client_noauth.post("/api/admin/reservations/20260805-0070/approve")
 check("(20) 헤더 없음 → 401 회귀 없음", r.status_code == 401)
 
 # (21) 기존 예약 상태전이 409 회귀(이미 예약확정인 건 재승인 — Slot 로직과 무관한 기존 Commit2 경로)
@@ -356,7 +375,7 @@ check("(21) 이미 예약확정인 건 재승인 → 기존 409(전이 불가) �
 
 # (22) 기존 거절 API 회귀(거절은 Slot 로직을 타지 않음)
 _reset_reservation("20260805-0072", "2026-08-05", "09:00")
-r = client.post("/api/admin/reservations/20260805-0072/reject", headers=STAFF, json={"reason": "정원 초과"})
+r = client.post("/api/admin/reservations/20260805-0072/reject", headers=STAFF_CSRF, json={"reason": "정원 초과"})
 check("(22) 거절 API 회귀 없음(200)", r.status_code == 200, str(r.status_code))
 
 
