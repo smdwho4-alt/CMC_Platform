@@ -30,11 +30,11 @@ from typing import Any
 
 _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parents[1]
-for _p in ("core", "services", "reservation"):
+for _p in ("core", "services", "reservation", "auth"):
     sys.path.insert(0, str(_ROOT / "src" / _p))
 sys.path.insert(0, str(_HERE))  # file_lock.py, reservation_approval_states.py (같은 src/api/ 디렉터리)
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
+from fastapi import APIRouter, Depends, HTTPException, Query  # noqa: E402
 from pydantic import BaseModel, field_validator  # noqa: E402
 
 import core_data_loader as loader  # noqa: E402
@@ -46,18 +46,14 @@ import sheets_readonly_service as sheets  # noqa: E402
 import sheets_write_service as sheets_write  # noqa: E402
 from file_lock import DataLock  # noqa: E402
 from json_store import now_iso, read_doc, write_doc  # noqa: E402
+from routes_auth import build_require_csrf, build_require_session_user  # noqa: E402
 
 
 def _build_require_user(data_dir: Path):
-    """Mock 인증 의존성 팩토리. 이 파일 내 모든 라우터가 공유한다(로직 중복 방지)."""
-    def require_user(x_user_id: str | None = Header(default=None)) -> dict[str, Any]:
-        if not x_user_id:
-            raise HTTPException(401, "X-User-Id 헤더 필요 (Mock 인증)")
-        user = next((u for u in loader.load_entity("User", data_dir) if u.get("id") == x_user_id), None)
-        if not user or user.get("status") != "ACTIVE":
-            raise HTTPException(401, f"유효하지 않은 사용자: {x_user_id}")
-        return user
-    return require_user
+    """인증 의존성 팩토리(Sprint8 Commit8-2: 세션 우선, Mock은 명시적 환경설정
+    시에만). 이 파일 내 모든 라우터가 공유한다(로직 중복 방지) —
+    routes_auth.build_require_session_user()를 그대로 위임한다."""
+    return build_require_session_user(data_dir)
 
 
 def _has_permission(user: dict[str, Any], data_dir: Path, *perms: str) -> bool:
@@ -82,6 +78,9 @@ def _build_require_permission(data_dir: Path, *perms: str):
             raise HTTPException(403, f"권한 없음: {' 또는 '.join(perms)} 필요 (현재 역할 {user.get('roleId')})")
         return user
 
+    # Sprint8 Commit8-2: 상태변경 API에 CSRF를 추가로 붙일 때 동일 require_user
+    # 객체를 재사용해 FastAPI Depends 캐시로 세션 검증이 한 번만 실행되게 한다.
+    require_permission.require_user = require_user  # type: ignore[attr-defined]
     return require_permission
 
 
@@ -269,6 +268,10 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     # (reservation_engine.py::approve_reservation()/reject_reservation()과 동일 권한,
     # 새 권한 모델을 만들지 않는다 — PM 권한 원칙).
     require_reservation_approve = _build_require_permission(data_dir, "reservation:approve")
+    # Sprint8 Commit8-2: 상태변경(쓰기) API에 CSRF 검증 추가(PM 승인사항 §12 최소
+    # 대상: 승인/거절/상태변경). require_user 객체를 재사용해 세션 검증 중복 없음.
+    require_csrf_reservation_approve = build_require_csrf(require_reservation_approve.require_user)
+    require_csrf_consultation_manage = build_require_csrf(require_consultation_manage.require_user)
 
     @router.get("/dashboard")
     def dashboard(user: dict[str, Any] = Depends(require_dashboard_view)):
@@ -403,6 +406,7 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     def update_consultation_status(
         consultation_id: str, body: ConsultationStatusBody,
         user: dict[str, Any] = Depends(require_consultation_manage),
+        _csrf: dict[str, Any] = Depends(require_csrf_consultation_manage),
     ):
         """상담 상태 변경 — OPEN→IN_PROGRESS→CLOSED 순차 전이만 허용(PM 승인 범위).
         CRM 생성·삭제, 예약 수정·삭제, 고객정보 수정은 이 엔드포인트에서 다루지
@@ -768,6 +772,7 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     @router.post("/reservations/{reservation_no}/approve")
     def approve_reservation(
         reservation_no: str, user: dict[str, Any] = Depends(require_reservation_approve),
+        _csrf: dict[str, Any] = Depends(require_csrf_reservation_approve),
     ):
         """예약 승인(권한: reservation:approve) — 예약접수 → 예약확정만 허용."""
         return _process_reservation_approval(reservation_no, "예약확정", user, reason=None)
@@ -776,6 +781,7 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     def reject_reservation(
         reservation_no: str, body: RejectReservationBody,
         user: dict[str, Any] = Depends(require_reservation_approve),
+        _csrf: dict[str, Any] = Depends(require_csrf_reservation_approve),
     ):
         """예약 거절(권한: reservation:approve, 기존 reject_reservation()과 동일 권한 재사용)
         — 예약접수 → 거절만 허용. 거절 사유는 필수이며 Sheets에는 저장하지 않고

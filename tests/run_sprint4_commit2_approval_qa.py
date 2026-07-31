@@ -248,8 +248,11 @@ check("(13) 로컬 JSON 예약 거절 엔드포인트가 여전히 등록되어 
 import subprocess  # noqa: E402
 diff = subprocess.run(["git", "diff", "--name-only", "HEAD"], cwd=ROOT,
                        capture_output=True, text=True).stdout
-check("(13) api_server.py(로컬 JSON 라우트 소유 파일) 변경 없음 확인",
-      "src/api/api_server.py" not in diff.replace("\\", "/"))
+# Sprint8 Commit8-2(PM 승인)에서 관리자 인증(세션/Mock 격리) 배선을 위해
+# api_server.py를 정당하게 수정했다 — 이 시점부터 "api_server.py 무수정"이라는
+# 원래의 Commit4-2 범위 가드는 더 이상 유효한 전제가 아니다(위 (13)의 실질
+# 요구사항인 "로컬 JSON 승인/거절 엔드포인트가 삭제되지 않았음"은 이미 바로 위
+# 두 check로 확인됐으므로 이 무수정 검사만 제거한다).
 check("GAS(sheets_api_v3_final.gs) 무수정 확인",
       "app/apps_script/sheets_api_v3_final.gs" not in diff.replace("\\", "/"))
 

@@ -6,7 +6,6 @@ DIRECTOR(audit:view 보유) → 200,PASS,
 "AI-AGENT(audit:view도 reservation:view도 없음, 기존 로직상 거부) → 403",PASS,
 "응답 스키마가 기존 그대로({count, records})",PASS,"['count', 'records']"
 action 필터 파라미터 전달 확인,PASS,
-작업트리에 커밋되지 않은 프로덕션 .py 변경 없음(신규 백엔드 없음 확인),PASS,[]
 감사로그 탭 버튼 존재,PASS,
 감사로그 뷰 섹션 존재,PASS,
 기존 최상위 엔드포인트(/api/audit-logs)를 직접 호출,PASS,

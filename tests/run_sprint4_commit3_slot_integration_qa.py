@@ -246,7 +246,9 @@ import subprocess  # noqa: E402
 diff = subprocess.run(["git", "diff", "--name-only", "HEAD"], cwd=ROOT,
                        capture_output=True, text=True).stdout.replace("\\", "/")
 check("GAS(sheets_api_v3_final.gs) 무수정 확인", "app/apps_script/sheets_api_v3_final.gs" not in diff)
-check("로컬 JSON 승인 API 소유 파일(api_server.py) 무수정 확인", "src/api/api_server.py" not in diff)
+# Sprint8 Commit8-2(PM 승인)에서 관리자 인증(세션/Mock 격리) 배선을 위해
+# api_server.py를 정당하게 수정했다 — 이 시점부터 무수정 전제는 더 이상 유효하지
+# 않아 이 개별 check는 제거한다(다른 무수정 검사는 그대로 유지).
 check("reservation_engine.py 무수정 확인(재사용만, 수정 없음)", "src/reservation/reservation_engine.py" not in diff)
 check("slot_generator.py 무수정 확인", "src/reservation/slot_generator.py" not in diff)
 

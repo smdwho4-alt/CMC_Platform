@@ -8,9 +8,11 @@ FastAPI 기반 REST API. Sprint B Reservation Engine을 그대로 노출한다.
     python -m uvicorn src.api.api_server:app --port 8600
     (데이터 폴더 변경: 환경변수 CSHSP_DATA_DIR)
 
-인증(Mock): 모든 보호 엔드포인트는 X-User-Id 헤더 필수.
-    users.json의 ACTIVE 사용자만 허용, 권한은 roles.json 기준.
-    Sprint E에서 실제 인증(JWT/세션)으로 교체 예정 — 의존성(require_user) 교체 지점.
+인증(Sprint8 Commit8-2): 보호 엔드포인트는 SQLite 기반 서버 세션 Cookie를
+    우선 검증한다(routes_auth.build_require_session_user). 세션이 없을 때만,
+    그리고 CSHSP_ENV != production이고 CSHSP_ALLOW_MOCK_AUTH=1이 명시적으로
+    설정된 경우에만 기존 X-User-Id Mock으로 대체 동작한다(기본값은 차단).
+    권한은 여전히 roles.json 기준(has_perm/need_perm 무변경).
 """
 from __future__ import annotations
 
@@ -24,6 +26,7 @@ _ROOT = _HERE.parents[1]
 sys.path.insert(0, str(_ROOT / "src" / "core"))
 sys.path.insert(0, str(_ROOT / "src" / "reservation"))
 sys.path.insert(0, str(_ROOT / "src" / "questionnaire"))
+sys.path.insert(0, str(_ROOT / "src" / "auth"))
 sys.path.insert(0, str(_HERE))
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query  # noqa: E402
@@ -38,6 +41,9 @@ from alternative_slot_recommender import recommend_alternative_slots  # noqa: E4
 from file_lock import DataLock  # noqa: E402
 from json_store import next_seq, now_iso, read_doc, write_doc  # noqa: E402
 from slot_generator import generate_slots  # noqa: E402
+from routes_auth import (  # noqa: E402
+    build_require_csrf, build_require_session_user, create_auth_router,
+)
 
 API_VERSION = "sprint-d-1.0"
 FULL_DETAIL_ROLES = {"ROLE-ADMIN", "ROLE-STAFF", "ROLE-DIRECTOR"}
@@ -133,11 +139,16 @@ def create_app(data_dir: str | Path | None = None, include_agents: bool = True,
 
     app = FastAPI(title="CSHSP API Layer", version=API_VERSION,
                   description="천안의료원 건강검진센터 AI 플랫폼 REST API (Sprint D)")
+    app.state.cshsp_data_dir = DATA_DIR
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
         allow_methods=["*"], allow_headers=["*"],
+        allow_credentials=True,  # Sprint8 Commit8-2: 세션 Cookie 전송에 필요
     )
+
+    # Sprint8 Commit8-2: 관리자 인증(로그인/로그아웃/현재 사용자) 라우터
+    app.include_router(create_auth_router(DATA_DIR))
 
     # Sprint F: 수검자 대면 채팅/본인확인/문진 제출 라우터
     # (오케스트레이터의 in-process API 클라이언트는 include_agents=False 앱을 생성 → 순환 방지)
@@ -158,14 +169,9 @@ def create_app(data_dir: str | Path | None = None, include_agents: bool = True,
     # Sprint 2: 신규 Endpoint 전용 Namespace(/api/admin/*, PM 결정사항 2) — 별도 라우터로 등록
     app.include_router(create_admin_namespace_router(DATA_DIR))
 
-    # ── Mock 인증/권한 ──
-    def require_user(x_user_id: str | None = Header(default=None)) -> dict[str, Any]:
-        if not x_user_id:
-            raise HTTPException(401, "X-User-Id 헤더 필요 (Mock 인증)")
-        user = next((u for u in loader.load_entity("User", DATA_DIR) if u.get("id") == x_user_id), None)
-        if not user or user.get("status") != "ACTIVE":
-            raise HTTPException(401, f"유효하지 않은 사용자: {x_user_id}")
-        return user
+    # ── 인증/권한 (Sprint8 Commit8-2: 세션 우선, Mock은 명시적 환경설정 시에만) ──
+    require_user = build_require_session_user(DATA_DIR)
+    require_csrf = build_require_csrf(require_user)
 
     def has_perm(user: dict[str, Any], perm: str) -> bool:
         role = next((r for r in loader.load_entity("Role", DATA_DIR) if r.get("id") == user.get("roleId")), None)

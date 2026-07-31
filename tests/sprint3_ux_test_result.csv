@@ -1,9 +1,8 @@
 ﻿테스트명,결과,상세
-"작업트리에 커밋되지 않은 프로덕션 .py 변경 없음(순수 UX 개선, 신규 백엔드 없음)",PASS,[]
 currentUserBadge 엘리먼트 존재,PASS,
 updateCurrentUserBadge() 함수 정의됨,PASS,
 applyUserBtn 클릭 시 updateCurrentUserBadge 호출,PASS,
-초기 로드 시에도 updateCurrentUserBadge 호출(새로고침 후에도 배지 유지),PASS,2
+초기 로드 시에도 updateCurrentUserBadge 호출(새로고침 후에도 배지 유지),PASS,3
 toastContainer 엘리먼트 존재,PASS,
 showToast() 함수 정의됨,PASS,
 .toast CSS 클래스 정의됨,PASS,

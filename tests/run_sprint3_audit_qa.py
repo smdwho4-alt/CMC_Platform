@@ -70,12 +70,13 @@ check("action 필터 파라미터 전달 확인",
 
 
 # ── 2. 이번 Commit이 백엔드를 전혀 수정하지 않았는지 확인 ──
-import subprocess  # noqa: E402
-diff = subprocess.run(["git", "diff", "--name-only", "HEAD"], cwd=ROOT,
-                       capture_output=True, text=True).stdout
-py_changes = [ln for ln in diff.splitlines() if ln.endswith(".py") and "tests/" not in ln]
-check("작업트리에 커밋되지 않은 프로덕션 .py 변경 없음(신규 백엔드 없음 확인)",
-      len(py_changes) == 0, str(py_changes))
+# 이 검사는 원래 Sprint3(감사로그 조회, UI 전용 Commit) 자신의 범위를 실시간
+# git diff로 스스로 검증하던 self-check였다. Sprint8 Commit8-2(PM 승인, 관리자
+# 인증 배선)처럼 이후의 정당한 백엔드 Commit이 아직 커밋되지 않은 상태로 이
+# 회귀 스위트가 함께 재실행되면, "현재 작업트리에 .py 변경이 있다"는 사실
+# 자체는 이 파일이 원래 검증하려던 범위와 무관해진다 — 그래서 이 개별
+# self-check는 더 이상 일반 회귀게이트로 유효하지 않아 제거한다(위 1번 섹션의
+# 실제 동작 검증은 그대로 유지).
 
 
 # ── 3. Portal UI 정적 구조 확인 ──

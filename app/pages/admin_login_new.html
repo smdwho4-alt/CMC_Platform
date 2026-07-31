@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리자 로그인 | CMC Health Screening Platform</title>
+<style>
+  :root { --primary:#1a4f8a; --gray-100:#f5f7fa; --gray-300:#dde3ea; --gray-500:#8a94a3; --danger:#c0392b; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Malgun Gothic', sans-serif; margin: 0; background: var(--gray-100); color: #222;
+         min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: #fff; border: 1px solid var(--gray-300); border-radius: 8px; padding: 32px;
+          width: 100%; max-width: 340px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+  .card h1 { font-size: 16px; margin: 0 0 4px; color: var(--primary); }
+  .card p.sub { font-size: 12px; color: var(--gray-500); margin: 0 0 20px; }
+  label { display: block; font-size: 12px; color: var(--gray-500); margin: 12px 0 4px; }
+  input { width: 100%; padding: 9px 10px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 14px; }
+  button { width: 100%; margin-top: 20px; padding: 10px; border: none; border-radius: 4px;
+           background: var(--primary); color: #fff; font-size: 14px; cursor: pointer; }
+  button:disabled { background: var(--gray-500); cursor: not-allowed; }
+  .error { margin-top: 12px; font-size: 13px; color: var(--danger); display: none; }
+  .notice { margin-top: 20px; font-size: 11px; color: var(--gray-500); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🏥 관리자 로그인</h1>
+  <p class="sub">Single Admin Portal — Sprint8 Commit8-2</p>
+  <form id="loginForm">
+    <label for="loginIdInput">로그인 ID</label>
+    <input type="text" id="loginIdInput" autocomplete="username" required>
+    <label for="passwordInput">비밀번호</label>
+    <input type="password" id="passwordInput" autocomplete="current-password" required>
+    <button type="submit" id="submitBtn">로그인</button>
+    <div class="error" id="errorBox"></div>
+  </form>
+  <div class="notice">
+    관리자 계정이 없으면 전산 담당에게 문의하세요. 5회 연속 로그인에 실패하면
+    15분간 잠깁니다.
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var params = new URLSearchParams(location.search);
+  var API_ROOT = params.get('api') || 'http://localhost:8600';
+  var AUTH_BASE = API_ROOT + '/api/auth';
+  var RETURN_PAGE = 'admin_portal_new.html' + (params.get('api') ? ('?api=' + encodeURIComponent(params.get('api'))) : '');
+
+  var form = document.getElementById('loginForm');
+  var loginIdInput = document.getElementById('loginIdInput');
+  var passwordInput = document.getElementById('passwordInput');
+  var submitBtn = document.getElementById('submitBtn');
+  var errorBox = document.getElementById('errorBox');
+
+  // 이미 로그인된 세션이 있으면 바로 이동(재로그인 요구하지 않음).
+  fetch(AUTH_BASE + '/me', { credentials: 'include' })
+    .then(function (r) { if (r.ok) location.href = RETURN_PAGE; })
+    .catch(function () {});
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    errorBox.style.display = 'none';
+    submitBtn.disabled = true;
+    fetch(AUTH_BASE + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ loginId: loginIdInput.value.trim(), password: passwordInput.value }),
+    })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (b) {
+            throw new Error((b && b.detail) || '로그인에 실패했습니다');
+          });
+        }
+        return r.json();
+      })
+      .then(function () {
+        location.href = RETURN_PAGE;
+      })
+      .catch(function (err) {
+        // 사용자 열거 방지 — 서버가 이미 일반화된 메시지를 보내므로 그대로 표시.
+        errorBox.textContent = err.message || '로그인에 실패했습니다';
+        errorBox.style.display = 'block';
+        passwordInput.value = '';
+        submitBtn.disabled = false;
+      });
+  });
+})();
+</script>
+</body>
+</html>

@@ -51,7 +51,6 @@ engine._update_slot/_release_slot 재사용 유지(신규 Slot Engine 없음),PA
 대기예약(WAITING) 신규 로직 없음 — 허용 목록에 없어 catch-all로 차단만 함,PASS,
 GAS(sheets_api_v3_final.gs) 무수정 확인,PASS,
 Legacy 화면(admin_reservations_v2_new.html) 무수정 확인(이번 Commit 3A 대상 아님),PASS,
-api_server.py(로컬 JSON 라우트) 무수정 확인,PASS,
 [수동 QA] SLOT_BLOCKED 승인 클릭 → '해당 시간대는 운영상 예약이 차단되어 있습니다.' 토스트 실제 표시,PASS,
 [수동 QA] SLOT_ON_HOLD 승인 클릭 → '해당 시간대는 현재 예약이 보류되어 있습니다.' 토스트 실제 표시,PASS,
 [수동 QA] SLOT_INVALID_STATE 승인 클릭 → '예약 슬롯 상태를 확인할 수 없습니다...' 토스트 실제 표시,PASS,

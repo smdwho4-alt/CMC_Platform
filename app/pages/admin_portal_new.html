@@ -73,6 +73,7 @@
   <div style="display:flex;align-items:center;gap:10px">
     <span id="currentUserBadge" class="badge badge-unknown">로그인 안 됨</span>
     <span id="connBadge" class="badge badge-unknown">연결 확인 중…</span>
+    <button id="logoutBtn" style="display:none">로그아웃</button>
   </div>
 </header>
 <div id="toastContainer" style="position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px"></div>
@@ -96,10 +97,10 @@
 
   <div class="toolbar">
     <div>
-      <label for="userIdInput">직원 ID(X-User-Id)</label><br>
-      <input type="text" id="userIdInput" placeholder="예: USR-0002">
+      <label for="userIdInput">로그인 계정(세션 인증, Sprint8 Commit8-2)</label><br>
+      <input type="text" id="userIdInput" placeholder="로그인 확인 중…" readonly>
     </div>
-    <button id="applyUserBtn" style="align-self:flex-end">적용</button>
+    <button id="applyUserBtn" style="align-self:flex-end" title="세션 정보 새로고침">새로고침</button>
   </div>
 
   <section id="view-dashboard" class="view active">
@@ -326,7 +327,13 @@
   var AUDIT_LOG_URL = API_ROOT + '/api/audit-logs';
   // AI 상담 통계도 기존 최상위 엔드포인트를 그대로 호출한다(PM 결정사항 6).
   var AI_DASHBOARD_URL = API_ROOT + '/api/dashboard/ai';
-  var USER_ID_KEY = 'cshsp_admin_portal_user_id';
+  var USER_ID_KEY = 'cshsp_admin_portal_user_id';  // Sprint8 이전 Mock 흔적 — 더 이상 인증에 사용하지 않음(읽기 전용 표시만)
+  var AUTH_BASE = API_ROOT + '/api/auth';
+  var LOGIN_PAGE = 'admin_login_new.html';
+  // Sprint8 Commit8-2: 세션 인증. CSRF_TOKEN은 로그인 성공/새로고침 시 서버가
+  // 발급한 값을 그대로 저장해 상태변경 요청 헤더에만 사용한다(URL/localStorage
+  // 미저장, 로그에도 남기지 않음 — PM 승인사항).
+  var CSRF_TOKEN = null;
 
   var connBadge = document.getElementById('connBadge');
   var currentUserBadge = document.getElementById('currentUserBadge');
@@ -348,7 +355,7 @@
   var PAGE_SIZE = 10;
   var currentPage = 0; // 0-based, GET /reservations의 page 파라미터와 동일
 
-  userIdInput.value = localStorage.getItem(USER_ID_KEY) || '';
+  var logoutBtn = document.getElementById('logoutBtn');
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -371,6 +378,33 @@
       currentUserBadge.className = 'badge badge-unknown';
       currentUserBadge.textContent = '로그인 안 됨';
     }
+  }
+
+  // Sprint8 Commit8-2: 페이지 진입 시 서버 세션을 확인한다. 세션이 없으면
+  // 로그인 화면으로 이동한다(Mock 인증으로 자동 대체하지 않음 — PM 승인사항).
+  // 성공 시에만 나머지 초기 조회(checkHealth/loadDashboard)를 진행한다.
+  function requireSession() {
+    return fetch(AUTH_BASE + '/me', { credentials: 'include' })
+      .then(function (res) {
+        if (res.status === 401) {
+          location.href = LOGIN_PAGE;
+          return null;
+        }
+        if (!res.ok) throw new Error('세션 확인 실패: ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data) return false;
+        userIdInput.value = data.user.id;
+        CSRF_TOKEN = data.csrfToken;
+        logoutBtn.style.display = '';
+        updateCurrentUserBadge();
+        return true;
+      })
+      .catch(function () {
+        location.href = LOGIN_PAGE;
+        return false;
+      });
   }
 
   // Sprint 3 Commit 5: 작업(주로 쓰기) 성공/실패를 화면 우상단 토스트로 알린다.
@@ -473,9 +507,9 @@
       document.getElementById('dashRecent').textContent = '직원 ID를 입력하고 "적용"을 눌러주세요.';
       return;
     }
-    fetch(ADMIN_BASE + '/dashboard', { headers: { 'X-User-Id': userId } })
+    fetch(ADMIN_BASE + '/dashboard', { headers: { 'X-User-Id': userId }, credentials: 'include' })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (!r.ok) throw new Error('Dashboard 조회 실패(HTTP ' + r.status + ')');
         return r.json();
@@ -525,9 +559,9 @@
     byStatusEl.className = 'state-box'; byStatusEl.textContent = '조회 중…';
     byDateEl.className = 'state-box'; byDateEl.textContent = '조회 중…';
 
-    fetch(ADMIN_BASE + '/statistics?' + params.toString(), { headers: { 'X-User-Id': userId } })
+    fetch(ADMIN_BASE + '/statistics?' + params.toString(), { headers: { 'X-User-Id': userId }, credentials: 'include' })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (r.status === 400) return r.json().then(function (b) { throw new Error(b.detail || '요청 오류'); });
         if (r.status === 503) throw new Error('Sheets 연동이 설정되지 않았습니다. 관리자에게 문의하세요.');
@@ -613,9 +647,9 @@
     crmLoadBtn.disabled = true;
     showCrmState('조회 중…');
 
-    fetch(ADMIN_BASE + '/consultations?' + params.toString(), { headers: { 'X-User-Id': userId } })
+    fetch(ADMIN_BASE + '/consultations?' + params.toString(), { headers: { 'X-User-Id': userId }, credentials: 'include' })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (!r.ok) throw new Error('상담 조회 실패(HTTP ' + r.status + ')');
         return r.json();
@@ -631,11 +665,12 @@
     btn.disabled = true;
     fetch(ADMIN_BASE + '/consultations/' + encodeURIComponent(id) + '/status', {
       method: 'POST',
-      headers: { 'X-User-Id': userId, 'Content-Type': 'application/json' },
+      headers: { 'X-User-Id': userId, 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
       body: JSON.stringify({ status: nextStatus }),
+      credentials: 'include',
     })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         return r.json().then(function (b) {
           if (!r.ok) throw new Error(b.detail || ('상태변경 실패(HTTP ' + r.status + ')'));
@@ -698,9 +733,9 @@
     auditLoadBtn.disabled = true;
     showAuditState('조회 중…');
 
-    fetch(AUDIT_LOG_URL + '?' + params.toString(), { headers: { 'X-User-Id': userId } })
+    fetch(AUDIT_LOG_URL + '?' + params.toString(), { headers: { 'X-User-Id': userId }, credentials: 'include' })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (!r.ok) throw new Error('감사로그 조회 실패(HTTP ' + r.status + ')');
         return r.json();
@@ -730,9 +765,9 @@
     byCategoryEl.className = 'state-box';
     byCategoryEl.textContent = '조회 중…';
 
-    fetch(AI_DASHBOARD_URL, { headers: { 'X-User-Id': userId } })
+    fetch(AI_DASHBOARD_URL, { headers: { 'X-User-Id': userId }, credentials: 'include' })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (!r.ok) throw new Error('AI 상담 통계 조회 실패(HTTP ' + r.status + ')');
         return r.json();
@@ -919,11 +954,12 @@
     var timeoutId = setTimeout(function () { controller.abort(); }, 8000);
     fetch(ADMIN_BASE + '/reservations/' + encodeURIComponent(reservationNo) + '/approve', {
       method: 'POST',
-      headers: { 'X-User-Id': userId },
+      headers: { 'X-User-Id': userId, 'X-CSRF-Token': CSRF_TOKEN },
       signal: controller.signal,
+      credentials: 'include',
     })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (r.status === 409) {
           return r.json().then(function (b) {
@@ -975,12 +1011,13 @@
     var timeoutId = setTimeout(function () { controller.abort(); }, 8000);
     fetch(ADMIN_BASE + '/reservations/' + encodeURIComponent(reservationNo) + '/reject', {
       method: 'POST',
-      headers: { 'X-User-Id': userId, 'Content-Type': 'application/json' },
+      headers: { 'X-User-Id': userId, 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
       body: JSON.stringify({ reason: reason }),
       signal: controller.signal,
+      credentials: 'include',
     })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         // 거절은 Slot 점유 로직(_reserve_slot_for_approval)을 타지 않으므로
         // (target_status가 "예약확정"일 때만 호출됨, routes_admin_portal.py 확인)
@@ -1057,9 +1094,9 @@
     loadBtn.disabled = true;
     showState('조회 중…');
 
-    fetch(PORTAL_BASE + '/reservations?' + params.toString(), { headers: { 'X-User-Id': userId } })
+    fetch(PORTAL_BASE + '/reservations?' + params.toString(), { headers: { 'X-User-Id': userId }, credentials: 'include' })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (r.status === 503) throw new Error('Sheets 연동이 설정되지 않았습니다. 관리자에게 문의하세요.');
         if (r.status === 502) throw new Error('Sheets 연동 서버 오류입니다. 잠시 후 다시 시도해 주세요.');
@@ -1103,9 +1140,9 @@
     detailModal.classList.add('open');
     detailBody.innerHTML = '<div class="state-box">불러오는 중…</div>';
 
-    fetch(PORTAL_BASE + '/reservations/' + encodeURIComponent(reservationNo), { headers: { 'X-User-Id': userId } })
+    fetch(PORTAL_BASE + '/reservations/' + encodeURIComponent(reservationNo), { headers: { 'X-User-Id': userId }, credentials: 'include' })
       .then(function (r) {
-        if (r.status === 401) throw new Error('인증 실패 — 직원 ID를 확인해 주세요.');
+        if (r.status === 401) { location.href = LOGIN_PAGE; throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.'); }
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         if (r.status === 404) throw new Error('예약을 찾을 수 없습니다: ' + reservationNo);
         if (r.status === 503) throw new Error('Sheets 연동이 설정되지 않았습니다. 관리자에게 문의하세요.');
@@ -1132,19 +1169,27 @@
   });
 
   applyUserBtn.addEventListener('click', function () {
-    var userId = currentUserId();
-    if (userId) localStorage.setItem(USER_ID_KEY, userId);
-    updateCurrentUserBadge();
-    loadDashboard();
+    // Sprint8 Commit8-2: 자유 텍스트 입력 대신 서버 세션을 다시 조회해
+    // 최신 로그인 상태를 반영한다(입력창은 읽기 전용).
+    requireSession().then(function (ok) { if (ok) loadDashboard(); });
+  });
+  logoutBtn.addEventListener('click', function () {
+    fetch(AUTH_BASE + '/logout', { method: 'POST', credentials: 'include' })
+      .catch(function () {})
+      .then(function () { location.href = LOGIN_PAGE; });
   });
   loadBtn.addEventListener('click', function () { load(true); }); // 필터 변경 후 조회 → 1페이지로 초기화
   // Sprint 3 Commit 5: 검색창에서 Enter로 바로 조회(버튼 클릭 없이).
   searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') load(true); });
+  // 입력창은 읽기 전용이 됐지만(Sprint8 Commit8-2), 포커스된 상태에서 Enter로도
+  // 세션 새로고침을 트리거할 수 있도록 기존 핸들러를 유지한다.
   userIdInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') applyUserBtn.click(); });
 
-  checkHealth();
-  updateCurrentUserBadge();
-  if (currentUserId()) loadDashboard();
+  requireSession().then(function (ok) {
+    if (!ok) return;
+    checkHealth();
+    loadDashboard();
+  });
 })();
 </script>
 </body>

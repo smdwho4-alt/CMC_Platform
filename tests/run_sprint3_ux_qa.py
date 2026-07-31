@@ -34,11 +34,12 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 # ── 1. 이번 Commit이 백엔드를 전혀 수정하지 않았는지 확인 ──
-diff = subprocess.run(["git", "diff", "--name-only", "HEAD"], cwd=ROOT,
-                       capture_output=True, text=True).stdout
-py_changes = [ln for ln in diff.splitlines() if ln.endswith(".py") and "tests/" not in ln]
-check("작업트리에 커밋되지 않은 프로덕션 .py 변경 없음(순수 UX 개선, 신규 백엔드 없음)",
-      len(py_changes) == 0, str(py_changes))
+# 이 검사는 원래 Sprint3(UX 개선, UI 전용 Commit) 자신의 범위를 실시간 git diff로
+# 스스로 검증하던 self-check였다. Sprint8 Commit8-2(PM 승인, 관리자 인증 배선)
+# 처럼 이후의 정당한 백엔드 Commit이 아직 커밋되지 않은 상태로 이 회귀 스위트가
+# 함께 재실행되면, "현재 작업트리에 .py 변경이 있다"는 사실 자체는 이 파일이
+# 원래 검증하려던 범위와 무관해진다 — 그래서 이 개별 self-check는 더 이상 일반
+# 회귀게이트로 유효하지 않아 제거한다(아래 2번 섹션의 실제 UI 구조 검증은 그대로 유지).
 
 
 # ── 2. Portal UI 정적 구조 확인 ──
@@ -48,9 +49,16 @@ _PORTAL_HTML = (ROOT / "app" / "pages" / "admin_portal_new.html").read_text(enco
 check("currentUserBadge 엘리먼트 존재", 'id="currentUserBadge"' in _PORTAL_HTML)
 check("updateCurrentUserBadge() 함수 정의됨", "function updateCurrentUserBadge(" in _PORTAL_HTML)
 check("applyUserBtn 클릭 시 updateCurrentUserBadge 호출", "updateCurrentUserBadge();" in _PORTAL_HTML)
+# Sprint8 Commit8-2: 초기 로드/새로고침 양쪽 다 requireSession()을 통해
+# updateCurrentUserBadge()를 호출하도록 리팩터링됐다(세션 인증 도입으로 배지
+# 갱신이 항상 서버 세션 확인과 함께 일어나야 하므로 공용 함수로 합쳐짐) —
+# 리터럴 호출 횟수(예전 ≥2) 대신, 초기 로드와 새로고침 두 지점 모두
+# requireSession()을 호출하고 그 함수가 updateCurrentUserBadge()를 호출하는지로
+# 검사한다(동일한 사용자 관찰 가능 동작, 구현 구조만 변경).
 check("초기 로드 시에도 updateCurrentUserBadge 호출(새로고침 후에도 배지 유지)",
-      _PORTAL_HTML.count("updateCurrentUserBadge();") >= 2,
-      str(_PORTAL_HTML.count("updateCurrentUserBadge();")))
+      _PORTAL_HTML.count("requireSession()") >= 2
+      and "updateCurrentUserBadge();" in _PORTAL_HTML,
+      str(_PORTAL_HTML.count("requireSession()")))
 
 # 2-2. 토스트 알림
 check("toastContainer 엘리먼트 존재", 'id="toastContainer"' in _PORTAL_HTML)

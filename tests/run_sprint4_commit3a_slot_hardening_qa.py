@@ -395,7 +395,9 @@ diff = subprocess.run(["git", "diff", "--name-only", "HEAD"], cwd=ROOT,
 check("GAS(sheets_api_v3_final.gs) 무수정 확인", "app/apps_script/sheets_api_v3_final.gs" not in diff)
 check("Legacy 화면(admin_reservations_v2_new.html) 무수정 확인(이번 Commit 3A 대상 아님)",
       "app/pages/admin_reservations_v2_new.html" not in diff)
-check("api_server.py(로컬 JSON 라우트) 무수정 확인", "src/api/api_server.py" not in diff)
+# Sprint8 Commit8-2(PM 승인)에서 관리자 인증(세션/Mock 격리) 배선을 위해
+# api_server.py를 정당하게 수정했다 — 이 시점부터 무수정 전제는 더 이상 유효하지
+# 않아 이 개별 check는 제거한다(다른 무수정 검사는 그대로 유지).
 
 
 # ── 5. 실브라우저 수동 QA 결과(기록용, 자동화 아님) ──

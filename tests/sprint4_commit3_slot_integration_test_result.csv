@@ -31,7 +31,6 @@ DataLock으로 Lock→Capacity검사→Slot점유 구간을 감쌈(동시성 원
 거절은 여전히 200(Slot 소비 없음),PASS,200
 "거절 시 Slot 상태 불변(0, AVAILABLE)",PASS,
 GAS(sheets_api_v3_final.gs) 무수정 확인,PASS,
-로컬 JSON 승인 API 소유 파일(api_server.py) 무수정 확인,PASS,
 "reservation_engine.py 무수정 확인(재사용만, 수정 없음)",PASS,
 slot_generator.py 무수정 확인,PASS,
 Slot 통합 코드 블록 추출 성공(진단용),PASS,9266

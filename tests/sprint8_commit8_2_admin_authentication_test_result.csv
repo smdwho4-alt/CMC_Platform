@@ -1,0 +1,63 @@
+﻿테스트,결과,상세
+AUTH-01 정상 로그인 200 + csrfToken 발급,PASS,200
+AUTH-01b 로그인 응답에 비밀번호/해시 미포함,PASS,
+AUTH-02 존재하지 않는 계정 401,PASS,401
+AUTH-03 잘못된 비밀번호 401,PASS,401
+AUTH-03b 계정 존재 여부를 노출하지 않음(동일 메시지),PASS,'아이디 또는 비밀번호가 올바르지 않습니다' vs '아이디 또는 비밀번호가 올바르지 않습니다'
+AUTH-04 비활성 계정(auth_users.status=DISABLED) 401,PASS,401
+AUTH-06 로그인 성공 시 Session ID 재발급(로그인마다 상이),PASS,재발급 확인
+AUTH-07 인증 없는 API 요청 401,PASS,401
+AUTH-08 위조된 X-User-Id(Mock 미허용 환경) 401,PASS,401
+AUTH-10a 로그아웃 전 /me 200,PASS,
+AUTH-10 로그아웃 후 동일 쿠키로 재요청 401,PASS,401
+SESS-01 정상 세션 검증 성공,PASS,
+SESS-02 존재하지 않는 세션 None,PASS,
+SESS-03 폐기된 세션 재검증 None,PASS,
+SESS-04 30분 유휴 초과 세션 무효화,PASS,
+SESS-05 8시간 절대 유효시간 초과 세션 무효화,PASS,
+SESS-06 사용자당 최대 동시 세션 2개(3번째 로그인 시 가장 오래된 세션 폐기),PASS,active=2
+SESS-06b 폐기된 가장 오래된 세션은 더 이상 유효하지 않음,PASS,
+SESS-07a 정상 세션(비활성화 전) 검증 성공,PASS,
+SESS-07b users.json(신원 SSOT) 비활성화 후 기존 세션 즉시 무효화,PASS,
+SESS-08a 정상 세션(변경 전) 검증 성공,PASS,
+SESS-08b 역할변경(security_stamp bump) 후 기존 세션 무효화,PASS,
+LOCK-01 4회 실패 후 정상 비밀번호로 여전히 로그인 가능(아직 미잠금),PASS,
+LOCK-02 5회 연속 실패 후 정상 비밀번호도 거부(잠금),PASS,
+LOCK-03 잠금 시각(locked_until)이 설정됨,PASS,
+LOCK-04 관리자 해제 후 정상 로그인 가능,PASS,
+COOKIE-01 HttpOnly 속성 포함,PASS,"['HttpOnly', 'Path', 'SameSite']"
+COOKIE-02 SameSite=lax 포함,PASS,"['HttpOnly', 'Path', 'SameSite']"
+COOKIE-03 세션 쿠키 값이 사용자ID/역할 등 평문 정보를 담지 않음(불투명 토큰),PASS,
+COOKIE-04 운영환경(CSHSP_ENV=production) Secure 기본 True(코드 레벨 확인),PASS,
+COOKIE-04b _cookie_secure() production에서 True,PASS,
+COOKIE-04c _cookie_secure() 개발환경 기본값도 True(명시적 예외 없으면 안전값),PASS,
+COOKIE-04d 명시적 CSHSP_COOKIE_INSECURE_DEV=1일 때만 False,PASS,
+CSRF-01 Token 없는 상태변경 403,PASS,403
+CSRF-02 잘못된 Token 403,PASS,403
+"CSRF-03 정상 Token은 CSRF 관문 통과(이후 단계에서 다른 사유로 실패 가능, 403 아니어야 함)",PASS,503
+CSRF-04 GET으로는 상태변경 라우트 자체가 존재하지 않음(405/404),PASS,405
+"AUTHZ-01 ROLE-DIRECTOR가 dashboard:view 권한으로 대시보드 접근 가능(200 또는 부분실패 응답, 403 아님)",PASS,200
+"AUTHZ-02 ROLE-CRM(dashboard:view 권한 없음, roles.json 실측)는 대시보드 접근 거부(403)",PASS,403
+MOCK-01 운영환경(CSHSP_ENV=production)에서 X-User-Id Mock 완전 차단,PASS,401
+MOCK-02 개발환경이어도 CSHSP_ALLOW_MOCK_AUTH 미설정이면 기본 차단,PASS,401
+MOCK-03 개발환경 + 명시적 CSHSP_ALLOW_MOCK_AUTH=1일 때만 Mock 허용,PASS,200
+AUDIT-LOGIN_SUCCESS 이벤트가 최소 1건 기록됨,PASS,LOGIN_SUCCESS
+AUDIT-LOGIN_FAILURE 이벤트가 최소 1건 기록됨,PASS,LOGIN_FAILURE
+AUDIT-LOGOUT 이벤트가 최소 1건 기록됨,PASS,LOGOUT
+AUDIT-SESSION_CREATED 이벤트가 최소 1건 기록됨,PASS,SESSION_CREATED
+AUDIT-SESSION_EXPIRED_IDLE 이벤트가 최소 1건 기록됨,PASS,SESSION_EXPIRED_IDLE
+AUDIT-SESSION_EXPIRED_ABSOLUTE 이벤트가 최소 1건 기록됨,PASS,SESSION_EXPIRED_ABSOLUTE
+AUDIT-CONCURRENT_SESSION_REVOKED 이벤트가 최소 1건 기록됨,PASS,CONCURRENT_SESSION_REVOKED
+AUDIT-ACCOUNT_TEMP_LOCKED 이벤트가 최소 1건 기록됨,PASS,ACCOUNT_TEMP_LOCKED
+AUDIT-ACCOUNT_UNLOCKED 이벤트가 최소 1건 기록됨,PASS,ACCOUNT_UNLOCKED
+AUDIT-MOCK_AUTH_BLOCKED 이벤트가 최소 1건 기록됨,PASS,MOCK_AUTH_BLOCKED
+AUDIT-CSRF_VALIDATION_FAILED 이벤트가 최소 1건 기록됨,PASS,CSRF_VALIDATION_FAILED
+AUDIT-SESSION_REVOKED 이벤트가 최소 1건 기록됨,PASS,SESSION_REVOKED
+AUDIT-민감정보 비밀번호 미포함,PASS,
+AUDIT-민감정보 CSRF Token 원문 미포함,PASS,
+SQLITE-01 auth.db 파일 생성됨,PASS,
+SQLITE-02 필수 테이블 3종 생성(auth_users/auth_sessions/auth_audit_log),PASS,"{'auth_audit_log', 'auth_sessions', 'auth_users'}"
+SQLITE-03 트랜잭션 Rollback(중복 login_id UNIQUE 제약 위반 시 예외 발생),PASS,
+SQLITE-04 Rollback된 트랜잭션의 레코드가 실제로 남지 않음,PASS,
+SEC-01 SQL Injection 형태 입력이 식별자 검증에서 거부됨(ValueError),PASS,
+SEC-02 SQL Injection 시도 후에도 테이블이 그대로 존재(파괴 없음),PASS,
