@@ -1,0 +1,14 @@
+﻿테스트,결과,상세
+"FC-01 운영환경(production) + Mock 강제 활성화 시도 → 여전히 차단(다른 값 무관, Fail-Closed)",PASS,401
+FC-02 Staging + CSHSP_ALLOW_MOCK_AUTH 미설정 → 기본 차단,PASS,401
+FC-03 CSHSP_ENV 자체 미설정(development로 간주) + Mock 플래그 미설정 → 기본 차단,PASS,401
+FC-04 개발환경 + 명시적 활성화 → 정상 허용(의도된 예외 경로),PASS,200
+FC-05 인증 실패 직후 X-User-Id 전송해도 Mock으로 자동전환되지 않음,PASS,"401,401"
+FC-06 Mock 허용 상태에서도 존재하지 않는 사용자 위조는 거부,PASS,401
+FC-07 CSHSP_ENV 값 표기 변형(대문자)도 정확히 소문자 비교되어 production으로 인식,PASS,
+FC-07b CSHSP_ENV=STAGING(대문자)도 정확히 인식(Mock 차단 대상),PASS,
+MOCKCSRF-01 [기록됨/알려진 위험] Mock+CSRF Token 없이 승인 요청이 CSRF 관문에서 막히지 않고 비즈니스 로직까지 도달함(403이 아니라 GAS 설정 부재 503로 실패 — 즉 CSRF는 통과했다는 증거),PASS,503
+MOCKCSRF-02 [기록됨/알려진 위험] Mock+CSRF Token 없이 거절 요청도 동일하게 CSRF 관문 통과,PASS,503
+"MOCKCSRF-03 Mock+CSRF Token 없는 상담 상태변경 요청도 CSRF 관문 통과(403 아님, 권한거부 403은 별개 사유)",PASS,"403 {""detail"":""권한 없음: crm:manage 필요 (현재 역할 ROLE-STAFF)""}"
+MOCKCSRF-04 대조군: 세션(Cookie) 경로는 동일 요청이 CSRF에서 실제로 차단됨(403),PASS,403
+"MOCKCSRF-05 결론: CSRF 예외는 Mock 경로에만 적용되고 세션 경로에는 적용되지 않음이 코드 동작으로 확인됨(§CSRF 적용범위 설계와 일치, 단 Mock의 Write 노출 자체는 별도 결정 필요 — Decision Required)",PASS,설계 의도와 실측 동작 일치 확인
