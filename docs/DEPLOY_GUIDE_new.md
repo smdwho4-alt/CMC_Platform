@@ -186,27 +186,39 @@ const CMC_CONFIG = {
 
 ## 5. Netlify 운영 환경 배포
 
-### 5-1. 현재 netlify.toml 확인
+### 5-1. 현재 netlify.toml 확인 (Commit8-2d에서 Publish Boundary 도입, 정정)
+
+**저장소 전체(`publish="."`)를 게시하던 이전 방식은 Commit8-2d에서 폐기됐다** —
+`src/`(백엔드 인증 소스), `tests/`, `docs/`, `tools/`, ADR·Threat Model 등 내부
+문서까지 정적 게시 대상에 포함되는 구조적 노출 위험이 있었기 때문이다(상세:
+Commit8-2c/8-2d 감사 이력). 현재는 `build_public_new.py`(저장소 루트)가 운영에
+필요하다고 확인된 파일만 명시적으로 `public/`에 복사하는 **허용목록(Allowlist)
+방식**이며, `public/`만 게시된다.
 
 프로젝트 루트의 `netlify.toml`:
 
 ```toml
 [build]
-  publish = "."
+  command = "python3 build_public_new.py"
+  publish = "public"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+  from = "/"
+  to = "/pages/admin_dashboard_new.html"
+  status = 302
 ```
 
-이미 설정 완료 상태입니다.
+`app/apps_script/`(GAS 소스), `app/docs/`(내부 참고문서)는 `build_public_new.py`의
+허용목록에 없어 애초에 `public/`에 복사되지 않는다 — 별도 차단 규칙에 의존하지
+않는다. `src/`, `tests/`, `docs/`, `tools/`, `data/` 등도 동일한 이유로 게시되지
+않는다. 허용목록 상세와 설계 근거는 Commit8-2d STEP1/STEP2 기록을 참조.
 
 ### 5-2. GitHub 연동 배포(권장)
 
 1. **GitHub 저장소 준비**(⛔ PM 승인 후에만 push): `git push -u origin main`
-2. **Netlify 사이트 생성**: netlify.com 로그인 → **Add new site** → **Import an existing project** → GitHub 저장소 선택 → Build 설정(Base directory 비움, Build command 비움 — 정적 파일, Publish directory `.`) → **Deploy site**
-3. **배포 완료 확인**: Netlify가 자동 URL 발급, 이후 GitHub main 브랜치 push 시 자동 재배포
+2. **Netlify 사이트 생성**: netlify.com 로그인 → **Add new site** → **Import an existing project** → GitHub 저장소 선택 → Build 설정(Base directory 비움, Build command `python3 build_public_new.py`, Publish directory `public`) → **Deploy site**
+3. **배포 완료 확인**: Netlify가 자동 URL 발급, 이후 GitHub main 브랜치 push 시 자동 재배포(단, Auto Publishing이 Locked 상태면 Push만으로는 실제 게시되지 않으며 PM 등 권한자가 관리화면에서 수동으로 Publish를 승인해야 한다)
+4. **Deploy Preview vs Production**: PR/브랜치 기반 Deploy Preview는 운영 URL과 분리된 별도 URL로 생성되어 운영에 영향을 주지 않는다. Production Deploy(운영 URL 반영)는 이와 별개로, Auto Publishing Locked 상태에서는 PM의 수동 승인 없이는 발생하지 않는다.
 
 ### 5-3. webAppUrl을 운영 환경에 반영하는 방법
 
