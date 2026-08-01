@@ -12,6 +12,30 @@ Set-StrictMode -Version 2.0
 $Script:ToolkitRoot = $PSScriptRoot
 $Script:ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
+# --- GAS Web App URL (민감정보 — 저장소에 하드코딩하지 않는다) --------
+# 이 값은 이 파일에 저장하지 않는다. Python 쪽(src/services/sheets_write_service.py 등)과
+# 동일한 환경변수명(CSHSP_GAS_WEBAPP_URL)을 우선 사용하고, 미설정 시에만 대화형
+# 세션에서 1회 입력을 받는다. 콘솔/로그에 실제 값을 echo하지 않는다.
+# 둘 다 없으면 빈 값으로 Fail-Closed 처리한다 — 이 값을 쓰는 점검(Test-Http)은
+# 예외를 그대로 catch해 WARN으로 보고하며, 별도로 아래에서 "미설정"임을 명확히 경고한다.
+$Script:GasWebAppUrl = $env:CSHSP_GAS_WEBAPP_URL
+if ([string]::IsNullOrWhiteSpace($Script:GasWebAppUrl)) {
+    if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+        Write-Host ''
+        Write-Host '  [설정 필요] CSHSP_GAS_WEBAPP_URL 환경변수가 없습니다.' -ForegroundColor Yellow
+        $Script:_gasUrlInput = Read-Host '  Google Apps Script Web App URL 입력(비워두면 건너뜀)'
+        if (-not [string]::IsNullOrWhiteSpace($Script:_gasUrlInput)) {
+            $Script:GasWebAppUrl = $Script:_gasUrlInput.Trim()
+        }
+        Remove-Variable -Name _gasUrlInput -Scope Script -ErrorAction SilentlyContinue
+    }
+}
+if ([string]::IsNullOrWhiteSpace($Script:GasWebAppUrl)) {
+    Write-Host '  [경고] AppsScriptUrl 미설정 — Apps Script 관련 점검은 실패/건너뜀 처리됩니다(Fail-Closed).' -ForegroundColor Yellow
+    Write-Host '         설정: $env:CSHSP_GAS_WEBAPP_URL = ''https://script.google.com/...'' 후 재실행' -ForegroundColor DarkYellow
+    $Script:GasWebAppUrl = ''
+}
+
 $Script:Settings = @{
     # 포트
     ApiPort              = 8600
@@ -27,7 +51,7 @@ $Script:Settings = @{
     # [v1.1.0-beta1] Pilot 예약페이지 v3(Rule 기반 선택검사) 전환 — PM 승인 2026-07-12
     # Rollback: 아래 값을 'http://127.0.0.1:4000/app/pages/reservation_new.html' 로 되돌리면 즉시 v1 복귀
     ReservationUrl       = 'http://127.0.0.1:4000/app/pages/reservation_v3_new.html'
-    AppsScriptUrl        = 'https://script.google.com/macros/s/AKfycbzHYWqERR8_hHxzIgCNwvrU8NLtZqu9RVuxezTBWtUKcTleAgcqRhYPX5rnHAM7uCGjng/exec'
+    AppsScriptUrl        = $Script:GasWebAppUrl
 
     # 폴더 (Toolkit 하위)
     LogFolder            = (Join-Path $PSScriptRoot 'logs')
