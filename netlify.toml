@@ -1,5 +1,11 @@
 [build]
-  publish = "."
+  command = "python3 build_public_new.py"
+  publish = "public"
+
+[[redirects]]
+  from = "/"
+  to = "/pages/admin_dashboard_new.html"
+  status = 302
 
 [[headers]]
   for = "/*"
