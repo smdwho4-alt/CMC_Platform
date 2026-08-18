@@ -164,6 +164,8 @@
 
 Commit8-3a STEP2-C/2-D의 Gate C1~C6 정의를 그대로 인용한다(ADR-017 §32에서 계승 명시). 이 문서는 Gate 조건을 재정의하지 않으며, §23의 미결정사항이 각 Gate의 미충족 사유로 그대로 대응된다.
 
+**Pre-Implementation Harness와 Integrated Implementation 구분(PM 결정, Commit8-3a STEP3-G)**: ADR-017 §29가 정의하는 Commit8-3b 착수 전 사전 Gate는 **Pre-Implementation Harness(격리된 최소 harness, Commit8-3b Production 코드와 별개 산출물)를 통한 Preliminary Validation**을 가리키며, Commit8-3b Production 코드 자체의 완성을 의미하지 않는다. 통합 구현(Commit8-3b) 완료 후에는 `docs/Sprint8_Security_Test_and_Deployment_Gate_Plan.md`의 G6에서 실제 코드 기준의 **Final G6 Validation**을 별도로 수행해야 한다. 이 문서는 이 두 Gate의 구분만 명시하며, 각 Gate의 상세 절차·Pass 기준은 재정의하지 않는다(ADR-017 §29, Security Test and Deployment Gate Plan §32/§40 참조).
+
 ## 21. 위협·통제·검증 매핑표
 
 | 위협(Security Gate STEP1/Threat Model 근거) | 통제 | 통제 상태 | 검증 방법 |
@@ -189,9 +191,9 @@ Commit8-3a STEP2-C/2-D의 Gate C1~C6 정의를 그대로 인용한다(ADR-017 §
 
 **DEFERRED 8건(정책결정, ADR-017 §30 원문 그대로 인용 — 이 문서에서 확정하지 않음)**: companion#1(변경시점)/#2(변경횟수)/#3(당일변경)/#8(보존기간)/#10(운영자실인증), STEP1§24-1(RESCHEDULED상태)/§24-3(담당부서)/§24-4(RateLimit).
 
-**DR-B-01 PoC 3건(기술검증, ADR-017 §29 원문 그대로 인용)**: (1) FastAPI SQLite UNIQUE 제약의 동시요청 원자성 실측, (2) GAS CacheService eviction 빈도 시뮬레이션, (3) 양쪽 저장소 정합성 불일치 시나리오 처리 검증.
+**DR-B-01 PoC 3건(기술검증, ADR-017 §29 원문 그대로 인용)**: (1) FastAPI SQLite UNIQUE 제약의 동시요청 원자성 실측, (2) GAS CacheService eviction 빈도 시뮬레이션, (3) 양쪽 저장소 정합성 불일치 시나리오 처리 검증. 3건 전부 **Pre-Implementation Harness(Commit8-3b Production 코드와 별개)** 로 수행하며, 항목(2)는 GAS를 실제 사용하므로 **별도 PM 승인과 격리된 테스트 환경(운영 GAS·Google Sheets 미사용) 확보 전에는 착수하지 않는다**(PM 명시 조건, ADR-017 §29 재인용).
 
-**DR-B-02 부하검증(성능검증, ADR-017 §29 원문 그대로 인용)**: Idempotency TTL 5개값에 대한 실측 트래픽/재시도 패턴 기반 부하검증.
+**DR-B-02 부하검증(성능검증, ADR-017 §29 원문 그대로 인용)**: Idempotency TTL 5개값에 대한 실측 트래픽/재시도 패턴 기반 부하검증. **2단계로 구분한다**(PM 결정, ADR-017 §29 재인용): **Phase 1(Preliminary Validation)** — Pre-Implementation Harness 기반 예비 부하검증, 결과는 TTL·저장방식·동시성 설계의 잠정 선택 근거일 뿐 Production 적합성을 보증하지 않음. **Phase 2(Final G6 Validation)** — Commit8-3b 통합 구현 완료 후 G6에서 실제 코드 기준으로 최종 재검증, 최종 TTL 확정은 Phase 2 결과로만 이루어짐. Phase 1 결과가 Phase 2나 배포 승인을 대체하지 않는다.
 
 이 세 범위는 혼합하지 않았으며, 각각 `TBD`(정책)/`PoC required`(기술)/`Load test required`(성능)로 후속 문서에서 표기할 것을 권고한다.
 

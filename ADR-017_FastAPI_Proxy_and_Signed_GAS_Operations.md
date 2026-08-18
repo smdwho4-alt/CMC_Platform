@@ -184,13 +184,20 @@ Commit8-3d에서 다음 4개 Operation이 전부 구현·검증되어야 "완료
 
 ## 29. 구현 전 검증조건
 
-Commit8-3b(HMAC/Nonce/Idempotency) 착수 전 반드시 완료해야 하는 PoC 3건(**Commit8-3a STEP2-C §6 원문 그대로, 임의로 명칭을 만들지 않음**):
+**Pre-Implementation Harness(사전 검증용 최소 harness)와 Integrated Implementation(Commit8-3b 정식 통합 구현)을 명확히 구분한다**(PM 결정, Commit8-3a STEP3-G — §36 승인 기록 참조). "Commit8-3b 착수 전 완료"란 Commit8-3b의 정식 Production 코드가 아니라, **Commit8-3b와 별도의 산출물인 Pre-Implementation Harness를 통한 Preliminary Validation(예비 검증)**을 의미한다. Harness는 Commit8-3b의 일부로 간주하지 않으며, Production 코드·운영 GAS·운영 Google Sheets를 사용하지 않는다.
+
+Commit8-3b(HMAC/Nonce/Idempotency) 착수 전 Pre-Implementation Harness로 완료해야 하는 PoC 3건(**Commit8-3a STEP2-C §6 원문 그대로, 임의로 명칭을 만들지 않음**):
 
 1. FastAPI SQLite UNIQUE 제약이 실제 동시 요청에서 원자적으로 중복을 거부하는지 실측 검증
-2. GAS CacheService의 실제 eviction 빈도를 이 시스템의 예상 트래픽 규모로 시뮬레이션
+2. GAS CacheService의 실제 eviction 빈도를 이 시스템의 예상 트래픽 규모로 시뮬레이션 — **GAS를 실제로 사용하는 PoC이므로, 별도 PM 승인과 격리된 테스트 환경(운영 GAS·Google Sheets 미사용)이 확보되기 전에는 작성·실행·배포하지 않는다**(PM 명시 조건, Commit8-3a STEP3-G)
 3. 양쪽 저장소 간 정합성이 어긋나는 경우(FastAPI는 신규로 판단했으나 GAS Cache에 이미 존재하는 극단적 사례)의 처리 로직 검증
 
-그리고 §14의 Idempotency TTL·저장구조에 대한 **부하검증**(Commit8-3a STEP2-C §7: 운영자 재시도 행동 패턴에 대한 실측 데이터 부재를 명시적으로 인정, 900초/1800초/48시간은 합리적 추정치이지 실측 확정값이 아님).
+§14의 Idempotency TTL·저장구조에 대한 **부하검증(DR-B-02)은 2단계로 구분한다**(PM 결정, Commit8-3a STEP3-G):
+
+- **Phase 1(Preliminary Validation)** — Pre-Implementation Harness 기반. Commit8-3b 착수 전 최소 harness로 수행하는 예비 부하검증(운영자 재시도 행동 패턴에 대한 실측 데이터 부재를 명시적으로 인정, Commit8-3a STEP2-C §7). 결과는 900초/1800초/48시간 등 TTL·저장방식·동시성 설계의 **잠정 선택 근거**로만 사용하며, Production 적합성이나 최종 성능을 보증하지 않는다.
+- **Phase 2(Final G6 Validation)** — Integrated Implementation 기반. Commit8-3b 정식 통합 구현 완료 후 `docs/Sprint8_Security_Test_and_Deployment_Gate_Plan.md` G6에서 실제 코드 기준으로 동일 위험(TTL·동시성·복구 기준)을 최종 재검증한다. 최종 TTL 확정과 Production 적합성 판단은 **Phase 2 결과로만** 이루어진다.
+
+**Phase 1과 PoC 3건의 harness 결과는 Commit8-3b 정식 착수의 설계·판단 근거일 뿐이며, G6 통과나 Production 배포 승인을 대체하지 않는다**(PM 명시 원칙, Commit8-3a STEP3-G). Commit8-3b 정식 구현 착수조건(Pre-Implementation Harness 결과 확보)과 G6 진입조건(Integrated Implementation 완료 후 Phase 2 실행)은 서로 다른 시점의 서로 다른 Gate이며 동일한 단일 실행이 아니다.
 
 ## 30. DEFERRED 8건
 
@@ -262,6 +269,7 @@ Netlify Auto Publishing 잠금 해제, Production Publish, GAS 신규버전 실�
 | 일자 | 승인자 | 내용 |
 |---|---|---|
 | 2026-08-02 | (초안) | ADR-017 초안 작성(Commit8-3a STEP2-D), 상태 Accepted with Conditions로 표기 — **PM의 파일 내용 최종 확인·서명은 별도 절차** |
+| 2026-08-18 | PM | Commit8-3a STEP3-G — §29를 Pre-Implementation Harness(사전 검증)와 Integrated Implementation(Commit8-3b 정식 구현)의 2단계로 명확화. DR-B-02를 Phase 1(harness 예비검증)/Phase 2(G6 최종검증)로 구분. GAS를 실제 사용하는 PoC(§29 항목2)는 별도 PM 승인·격리된 테스트 환경 전 착수 금지를 명시. Accepted with Conditions 상태 및 기존 보안 원칙은 변경하지 않음 |
 
 ---
 

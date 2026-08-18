@@ -208,10 +208,12 @@ Threat Model §46-G(REGR-01~10)를 인용하며, §5에서 재확인한 기존 3
 
 ## 32. 성능·부하 Gate (G6)
 
-**Entry criteria**: G5 통과, DR-B-01 PoC 3건 완료.
-**Required checks**: DR-B-02 부하검증(Idempotency TTL), GAS CacheService eviction 실측.
-**Pass criteria**: **이 문서에서 정의하지 않음** — 실측 데이터 부재로 Pass 기준 자체가 REQUIRES LOAD VALIDATION 상태(ADR-017 §29 재인용).
-**Blocker**: PoC/부하검증 미착수.
+**G6 = Final G6 Validation(Integrated Implementation 기반, PM 결정 Commit8-3a STEP3-G 재인용)**: G6은 Commit8-3b 정식 통합 구현이 완료된 이후에만 진입하는 Gate이며, Commit8-3b 착수 전 Pre-Implementation Harness로 수행하는 예비 검증(§40의 Pre-G1, Phase 1)과는 서로 다른 시점의 별개 Gate다. Pre-G1 통과가 G6 진입이나 통과를 대체하지 않는다.
+
+**Entry criteria**: G5 통과, Commit8-3b 통합 구현 완료, §40 Pre-G1(DR-B-01 harness PoC 3건·DR-B-02 Phase 1) 완료.
+**Required checks**: DR-B-02 Phase 2 부하검증(Idempotency TTL, 실제 통합 코드 기준), GAS CacheService eviction 실측(실제 통합 코드 기준), harness(Phase 1) 결과와 통합 구현 결과의 편차 확인.
+**Pass criteria**: **이 문서에서 정의하지 않음** — 실측 데이터 부재로 Pass 기준 자체가 REQUIRES LOAD VALIDATION 상태(ADR-017 §29 재인용). Phase 1(예비검증) 결과만으로는 G6 Pass 판정을 내리지 않는다.
+**Blocker**: Commit8-3b 통합 구현 미착수, Phase 2 부하검증 미착수.
 **Approval status**: DEFERRED(PM/개발팀).
 
 ## 33. 배포 전 Gate (G7)
@@ -255,10 +257,17 @@ Threat Model §46-G(REGR-01~10)를 인용하며, §5에서 재확인한 기존 3
 
 ## 40. DR-B-01·DR-B-02 의존성
 
-| ID | 내용 | 이 문서에서의 위치 | 의존 Gate |
-|---|---|---|---|
-| DR-B-01 | PoC 3건(SQLite UNIQUE 원자성/CacheService eviction 시뮬레이션/양쪽 저장소 정합성 불일치 처리) | §16(REPLAY), §21(IDEM) | G6 |
-| DR-B-02 | Idempotency TTL 부하검증 | §21(IDEM) | G6 |
+**Pre-G1(보조 Gate, 정식 G0~G9 체계와 구분, PM 결정 Commit8-3a STEP3-G)**: Commit8-3b 착수 전 Pre-Implementation Harness로 수행하는 Preliminary Validation을 가리키는 보조 Gate다. 정식 G0~G9 번호는 재번호화하지 않으며, Pre-G1은 그 앞 단계에 위치하되 G0(설계·정책 확정)와도 별개다.
+
+- **목적**: DR-B-01 harness PoC 3건, DR-B-02 Phase 1(예비 부하검증) 수행, Commit8-3b 설계 선택과 착수 판단 근거 확보.
+- **환경**: 격리된 최소 harness(Commit8-3b Production 코드 아님). PoC#2(GAS CacheService eviction)는 GAS를 실제 사용하므로 별도 PM 승인과 격리된 테스트 환경(운영 GAS·Google Sheets 미사용) 확보 전에는 착수하지 않는다(PM 명시 조건).
+- **Pass 시 효력**: Commit8-3b 정식 착수의 설계·판단 근거로만 사용. **G6 Pass나 배포 승인을 대체하지 않는다.**
+- **현재 상태**: 실제 PoC·부하검증 결과 없음 — **DEFERRED**(미착수).
+
+| ID | 내용 | 이 문서에서의 위치 | Phase 1(Pre-G1, harness) | Phase 2(G6, 통합구현) | 현재 상태 |
+|---|---|---|---|---|---|
+| DR-B-01 | PoC 3건(SQLite UNIQUE 원자성/CacheService eviction 시뮬레이션/양쪽 저장소 정합성 불일치 처리) | §16(REPLAY), §21(IDEM) | Pre-Implementation Harness로 수행(PoC#2는 별도 승인 필요) | 통합 구현 기준 재확인(G6 Required checks) | DEFERRED |
+| DR-B-02 | Idempotency TTL 부하검증 | §21(IDEM) | Phase 1: harness 기반 예비 부하검증(잠정 선택 근거) | Phase 2: 통합 구현 기준 최종 부하검증(TTL 확정 근거) | DEFERRED |
 
 두 ID 모두 ADR-017 §29 원문 그대로 인용하며, 이 문서는 결과를 추정하지 않는다.
 
@@ -338,13 +347,14 @@ Threat Model §46-G(REGR-01~10)를 인용하며, §5에서 재확인한 기존 3
 
 | Gate | Entry criteria | Required checks | Pass criteria | Evidence | Blocker | Approval status | Next action |
 |---|---|---|---|---|---|---|---|
+| **Pre-G1**(보조 Gate, G0~G9 정식 번호 외, §40 참조) | 없음(Pre-Implementation Harness 준비) | DR-B-01 harness PoC 3건, DR-B-02 Phase 1 예비검증 | Commit8-3b 설계·착수 판단 근거 확보(G6·배포승인 대체 아님) | 없음(미착수) | PoC#2(GAS 사용)는 별도 PM 승인·격리 환경 필요 | DEFERRED | PM 승인(harness 착수) |
 | G0 | 없음(설계 착수) | 정책 확정 여부 확인 | 관련 DEFERRED 항목 해소 | ADR-016/017 | companion#1-10 일부, STEP1§24-* 일부 | DEFERRED | PM 정책결정 |
 | G1 | G0 관련분 확정 | 코드 구현+리뷰 | 구현 완료, 리뷰 승인 | 없음(미착수) | 구현 자체 없음 | DEFERRED | Commit8-3b/8-3d 착수 승인 |
 | G2 | G1 통과 | §28 정적/Secret/의존성 검사 | 검출 0건 | 없음 | 자동화 도구 부재 | DEFERRED | 도구 도입 검토(선택) |
 | G3 | G1 통과 | §29 단위테스트 | 신규 단위 테스트 전항목 PASS | 없음 | 구현 없음 | DEFERRED | §29 참조 |
 | G4 | G3 통과 | §30 통합테스트 | 8-Operation 각 1+ 케이스 PASS | 없음 | RESCHEDULE 정책 미확정 | DEFERRED | §30 참조 |
 | G5 | G4 통과 | §31 보안테스트 | Critical/High Sprint8 범위 항목 통제 확인 | 없음 | HMAC/Nonce 미구현 | DEFERRED | §31 참조 |
-| G6 | G5 통과 | §32 성능/부하 | REQUIRES LOAD VALIDATION 상태 | 없음 | PoC/부하검증 미착수 | DEFERRED | DR-B-01/02 착수 승인 |
+| G6 | G5 통과, Pre-G1(Phase 1) 완료 | §32 성능/부하(Phase 2, 통합구현 기준) | REQUIRES LOAD VALIDATION 상태 | 없음 | Commit8-3b 통합구현 미착수, Phase 2 미착수 | DEFERRED | Pre-G1 완료 후 Phase 2 착수 승인 |
 | G7 | G6 통과 | §33 배포전 운영승인 | 미정(승인권자 DEFERRED) | 없음 | DR8-1-30 미확정 | DEFERRED | 승인권자 결정 |
 | G8 | G7 통과 | §34 배포승인 | PM 개별승인(4종 독립) | 없음 | DR8-1-27~31 미확정 | DEFERRED | 승인권자 결정 |
 | G9 | G8 통과+제한배포 | §35 Smoke Test | 미정 | 없음 | 배포 자체 미발생 | DEFERRED | Runbook 수립 |
