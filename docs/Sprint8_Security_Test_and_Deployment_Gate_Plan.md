@@ -364,7 +364,7 @@ companion#1/#2/#3/#8/#10, STEP1§24-1/§24-3/§24-4(정책), DR-B-01 PoC 3건/DR
 
 ## 45. 결론
 
-이 문서는 Commit8-3a에서 확정된 4개 설계문서의 보안 요구사항을 42개 신규/재사용 Test ID와 G0~G9 10단계 배포 Gate로 연결했다. 현재 **EXECUTABLE NOW**로 판정된 항목(인증/세션/기존 승인·거절 RBAC/일부 감사로그/기존 회귀 스위트 3종)은 이미 Commit8-2에서 구현·검증되어 있으며 이번 STEP에서 재실행하지 않았다. 나머지 대부분(HMAC 배선, Nonce/Idempotency/CAS, RESCHEDULE/CANCEL/COMPLETE/NOTE 4개 Operation)은 **EXECUTABLE AFTER IMPLEMENTATION**, **REQUIRES POC**, 또는 **REQUIRES POLICY DECISION** 상태로 남아 있으며, 이 문서 단독으로는 G3 이상의 Gate를 통과할 수 없다. 조사 과정에서 `src/auth/service_hmac.py`가 이미 존재하나 ADR-017 최종 Canonical String 형식과 다르다는 새로운 Gap을 발견했다(§5/§8). 배포 승인·Rollback 결정권자는 여전히 전부 DEFERRED이며, 이 문서는 어떤 정책도 임의로 확정하지 않았다.
+이 문서는 Commit8-3a에서 확정된 4개 설계문서의 보안 요구사항을 43개 신규/재사용 Test ID와 G0~G9 10단계 배포 Gate로 연결했다. 현재 **EXECUTABLE NOW**로 판정된 항목(인증/세션/기존 승인·거절 RBAC/일부 감사로그/기존 회귀 스위트 3종)은 이미 Commit8-2에서 구현·검증되어 있으며 이번 STEP에서 재실행하지 않았다. 나머지 대부분(HMAC 배선, Nonce/Idempotency/CAS, RESCHEDULE/CANCEL/COMPLETE/NOTE 4개 Operation)은 **EXECUTABLE AFTER IMPLEMENTATION**, **REQUIRES POC**, 또는 **REQUIRES POLICY DECISION** 상태로 남아 있으며, 이 문서 단독으로는 G3 이상의 Gate를 통과할 수 없다. 조사 과정에서 `src/auth/service_hmac.py`가 이미 존재하나 ADR-017 최종 Canonical String 형식과 다르다는 새로운 Gap을 발견했다(§5/§8). 배포 승인·Rollback 결정권자는 여전히 전부 DEFERRED이며, 이 문서는 어떤 정책도 임의로 확정하지 않았다.
 
 ---
 
