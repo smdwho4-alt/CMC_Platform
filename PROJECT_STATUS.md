@@ -119,7 +119,7 @@
 | DR-B-01 PoC#1(SQLite 원자성) | ✅ PASS·Commit·Push | `6ffc5cf`("test: add Sprint8 SQLite nonce atomicity PoC") |
 | DR-B-01 PoC#2(GAS CacheService) | 🟡 PASS WITH CONDITIONS — 실행·보고서 작성 완료 | harness·결과보고서(아래), 계획서는 `5d8b9af`로 Push 완료 |
 | DR-B-01 PoC#3 | 🟡 PASS — FAIL-CLOSED DECISION LOGIC VERIFIED — 실행·보고서 작성 완료 | [실행계획서](docs/Sprint8_DR_B_01_PoC3_Nonce_Store_Consistency_Fail_Closed_Test_Plan.md), [harness](tests/pre_g1/test_dr_b_01_poc3_nonce_store_consistency_fail_closed.py), [결과보고서](docs/Sprint8_DR_B_01_PoC3_Nonce_Store_Consistency_Fail_Closed_Result_Report.md) |
-| DR-B-02 Phase 1 | ⬜ 미착수 | PoC#3 결과와 관련 정책·실행조건 확인 필요 |
+| DR-B-02 Phase 1 | 🟡 실행계획서 작성 완료·harness 미착수 — OFFICIAL GATE BLOCKED INPUT | [Phase 1 실행계획서](docs/Sprint8_DR_B_02_Phase1_Idempotency_TTL_Preliminary_Load_Test_Plan.md), 실측 트래픽·재시도 입력자료 부재. 로컬 합성 harness 작성·실행은 별도 승인 필요 |
 
 **DR-B-01 PoC#2 상세(요약 — 전체는 결과보고서 참조)**
 
