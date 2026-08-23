@@ -2,7 +2,7 @@
 
 > 이 문서는 프로젝트의 **현재 시점 상태 스냅샷**이다. 최신 정보를 유지하는 것이 원칙이며, 상태가 바뀔 때마다 갱신한다.
 
-**최종 갱신**: 2026-07-29 (Sprint 7 Commit7-1 — SSOT Documentation Synchronization)
+**최종 갱신**: 2026-07-29 (Sprint 7 Commit7-1 — SSOT Documentation Synchronization) · **최종 부분 갱신**: 2026-08-23 (Sprint8 보안 트랙 ADR-017/Pre-G1 DR-B-01만 부분 현행화 — §2-2 참조. 아래 §1/§3 전체 현황표는 여전히 2026-07-29 기준이며, 전체 PROJECT_STATUS 재정합화는 별도 작업 필요)
 **버전**: v1.1.0-beta1 (DEV-004 태그, 2026-07-12, 최신 태그) — Sprint 3~7 작업물은 아직 별도 태그 없음. 이전 릴리스: [RELEASE_REPORT_v1.0.0-pilot_new.md](RELEASE_REPORT_v1.0.0-pilot_new.md), [RELEASE_NOTES_v0.9.0-pilot.md](RELEASE_NOTES_v0.9.0-pilot.md)
 **단계**: Sprint A~I + Sprint 2(Dashboard v3) + DEV-003/DEV-004 완료 → **Architecture Freeze(Sprint 0) 완료** → Single Admin Portal Sprint 1~3(별도 트랙)·Sprint 3.5(Architecture Review) 완료 → **Sprint 4(Reservation Core Integration) 완료**(Commit 0/1/2/3/3A/5-1/5-2, 상세 §1) → **Sprint 5(Portal Integration) 완료**(Commit5-3.1/5-3.2/5-3.3) → **Sprint 6(Legacy Guard·Technical Debt Cleanup) 완료**(Commit6-1/6-2/6-3) → **Sprint 7("Operation Readiness Sprint") 진행 중 — Design Freeze(Commit7-0) 완료, Commit7-1(SSOT 동기화, 본 갱신) 진행 중**
 **공식 Baseline**: `4f21d0e`(Sprint6 Closeout, PM 확정) → Sprint7 Commit7-0(`3c42c97`) 위에서 진행 중
@@ -106,6 +106,32 @@
 | 3 | `reservation_v2_new.html` 실제 브라우저 QA | 🔲 **Follow-up #1** — 파일 무수정 확인됨(회귀 위험 낮음), Pilot 초기 병행 수행 |
 | 4 | LockService 실동시성(503) 검증 | 🔲 **Follow-up #2** — Pilot 중 동시 접속 낮아 영향 제한적 |
 | 5 | `CMC_CONFIG.load()` 미호출 — 모드전환 롤백 미작동 | 🔲 **Follow-up #3** — 별도 세션 진행 중(task_a8cf5790). 기존 결함으로 별도 티켓 분리 |
+
+---
+
+## 2-2. Sprint8 보안 트랙 부분 현행화 — DR-B-01
+
+> 이 소절은 Sprint8 보안 트랙(ADR-017, DR-B-01)만 2026-08-23 기준으로 부분 현행화한 것이다. 아래 §1(한눈에 보기)·§3(진행 중/대기 항목)의 완료율과 행은 여전히 2026-07-29(Sprint 7 Commit7-1) 기준이며 이번 작업에서 수정하지 않았다. Pre-G1 전체를 완료로 표시하지 않으며, Commit8-3b 착수 가능을 의미하지도 않는다(ADR-017 §29 원칙).
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| ADR-017 §29 2단계 검증 Gate 정의 | ✅ 완료·Commit·Push | `54dee94`("docs: clarify Sprint8 two-stage validation gates") |
+| DR-B-01 PoC#1(SQLite 원자성) | ✅ PASS·Commit·Push | `6ffc5cf`("test: add Sprint8 SQLite nonce atomicity PoC") |
+| DR-B-01 PoC#2(GAS CacheService) | 🟡 PASS WITH CONDITIONS — 실행·보고서 작성 완료 | harness·결과보고서(아래), 계획서는 `5d8b9af`로 Push 완료 |
+| DR-B-01 PoC#3 | ⬜ 미착수 | 별도 범위·착수 승인 필요 |
+| DR-B-02 Phase 1 | ⬜ 미착수 | PoC#3 결과와 관련 정책·실행조건 확인 필요 |
+
+**DR-B-01 PoC#2 상세(요약 — 전체는 결과보고서 참조)**
+
+- 최종 판정: `PASS WITH CONDITIONS — EXECUTION COMPLETED, EVICTION NOT OBSERVED`
+- P2-01~P2-12 계획된 절차가 완료되었다(P2-05는 `runPoc2All()` 내에서 `NOT_RUN`이었으나 별도 수동 TTL 사이클에서 `PASS`로 완료되었다).
+- 핵심 수치: P2-07은 pressure key 200개 투입에도 marker 5/5가 잔존해 조기 eviction이 0건 관측되었고, P2-08은 3회 반복 잔존율이 [1,1,1]이었으며, P2-05는 366,283ms 경과(TTL 300,000ms) 후 정상 만료(`nullAfterTtl=true`)로 확인되었다.
+- 최종 정리 결과는 `checked=0, remaining=0, handoffPropertyPresent=false`이며, 이는 harness가 추적한 범위의 잔존만 미확인되었다는 의미이고 Cache 전체의 무잔존을 보증하지 않는다.
+- 최초 실행 시도에서 Sheets 과잉권한 요청으로 동의를 거부해 당시 함수는 실행되지 않았고, 원인은 `GAS AUTO-SCOPE OVERPERMISSION SUSPECTED`로 미확정 상태이며, 격리 프로젝트에 `oauthScopes: []`를 적용·확인한 뒤에만 실행을 진행했다.
+- 해석 제한: 이번 결과는 Production에서 eviction이 발생하지 않는다는 보증이 아니고, CacheService 단독 Replay 차단의 Production 적합성을 입증한 것도 아니며, TTL 300초를 확정하지 않고, Lock 실동시성은 미검증이며, DR-B-02·G6·Commit8-3b 착수 승인을 대체하지 않는다.
+- 산출물:
+  - [tests/pre_g1/gas/dr_b_01_poc2_cache_service_harness.gs](tests/pre_g1/gas/dr_b_01_poc2_cache_service_harness.gs)
+  - [docs/Sprint8_DR_B_01_PoC2_GAS_CacheService_Result_Report.md](docs/Sprint8_DR_B_01_PoC2_GAS_CacheService_Result_Report.md)
 
 ---
 
