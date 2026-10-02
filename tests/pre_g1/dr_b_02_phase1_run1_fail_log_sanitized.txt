@@ -1,0 +1,109 @@
+python_version=Python 3.14.2
+command=python3 -m unittest -v sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate
+cwd=<SCRATCHPAD>
+---- BEGIN OUTPUT ----
+test_b2_01_state_ttl_mapping_unit_check (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_01_state_ttl_mapping_unit_check) ... ok
+test_b2_02_in_progress_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_02_in_progress_ttl_boundary)
+TTL 경계 검증(PASS 대상) + ADR-017 14/16/23절 정책 검증(별도 PASS ... FAIL
+test_b2_03_succeeded_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_03_succeeded_ttl_boundary) ... ok
+test_b2_04_failed_retryable_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_04_failed_retryable_ttl_boundary) ... ok
+test_b2_05_failed_final_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_05_failed_final_ttl_boundary) ... ok
+test_b2_06_unknown_ttl_boundary_48h (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_06_unknown_ttl_boundary_48h) ... ok
+test_b2_07_concurrent_same_key_exactly_one_created (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_07_concurrent_same_key_exactly_one_created) ... ok
+test_b2_08_concurrent_distinct_keys_no_cross_contamination (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_08_concurrent_distinct_keys_no_cross_contamination) ... ok
+test_b2_09a_retry_convergence_to_succeeded (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_09a_retry_convergence_to_succeeded) ... FAIL
+test_b2_09b_retry_convergence_to_failed_final (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_09b_retry_convergence_to_failed_final) ... FAIL
+test_b2_10_synthetic_burst_retry_storm (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_10_synthetic_burst_retry_storm) ... ok
+test_b2_11_time_work_guard_partial_result_preserved (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_11_time_work_guard_partial_result_preserved) ... ok
+test_b2_12_repeat_full_b2_02_to_b2_10_stability_and_cleanup (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_12_repeat_full_b2_02_to_b2_10_stability_and_cleanup)
+계획서 §7 B2-12: "B2-02~B2-10 패턴을 3회 반복"을 그대로 수행한다. ... ERROR
+test_policy_unresolved_states_block_without_mutation (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_policy_unresolved_states_block_without_mutation)
+SUCCEEDED/FAILED_RETRYABLE/FAILED_FINAL/UNKNOWN의 만료 후 전이 ... ok
+
+======================================================================
+ERROR: test_b2_12_repeat_full_b2_02_to_b2_10_stability_and_cleanup (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_12_repeat_full_b2_02_to_b2_10_stability_and_cleanup)
+계획서 §7 B2-12: "B2-02~B2-10 패턴을 3회 반복"을 그대로 수행한다.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SCRATCHPAD>\sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.py", line 1047, in test_b2_12_repeat_full_b2_02_to_b2_10_stability_and_cleanup
+    print(
+    ~~~~~^
+        f"[B2-12] repeats={REPEAT_COUNT} distinct_outcome_patterns={len(distinct_patterns)} "
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        f"n={stats['count']} (관측값만 \u2014 합격기준 아님, §8)"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+UnicodeEncodeError: 'cp949' codec can't encode character '\u2014' in position 332: illegal multibyte sequence
+
+======================================================================
+FAIL: test_b2_02_in_progress_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_02_in_progress_ttl_boundary)
+TTL 경계 검증(PASS 대상) + ADR-017 14/16/23절 정책 검증(별도 PASS
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SCRATCHPAD>\sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.py", line 785, in test_b2_02_in_progress_ttl_boundary
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        retry_result[0],
+        ^^^^^^^^^^^^^^^^
+        "RECONCILIATION_REQUIRED_BLOCKED",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "UNKNOWN 전이 후 try_create()가 자동 재실행을 차단하지 못함(CREATED가 아니어야 함)",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 'DUPLICATE_BLOCKED' != 'RECONCILIATION_REQUIRED_BLOCKED'
+- DUPLICATE_BLOCKED
++ RECONCILIATION_REQUIRED_BLOCKED
+ : UNKNOWN 전이 후 try_create()가 자동 재실행을 차단하지 못함(CREATED가 아니어야 함)
+
+======================================================================
+FAIL: test_b2_09a_retry_convergence_to_succeeded (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_09a_retry_convergence_to_succeeded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SCRATCHPAD>\sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.py", line 922, in test_b2_09a_retry_convergence_to_succeeded
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        len(set(data["nonces_used"])), RETRY_ATTEMPTS, "재시도마다 새 nonce가 생성되지 않음"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 5 != 4 : 재시도마다 새 nonce가 생성되지 않음
+
+======================================================================
+FAIL: test_b2_09b_retry_convergence_to_failed_final (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_09b_retry_convergence_to_failed_final)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SCRATCHPAD>\sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.py", line 941, in test_b2_09b_retry_convergence_to_failed_final
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        len(set(data["nonces_used"])), RETRY_ATTEMPTS, "재시도마다 새 nonce가 생성되지 않음"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 5 != 4 : 재시도마다 새 nonce가 생성되지 않음
+
+----------------------------------------------------------------------
+Ran 14 tests in 10.149s
+
+FAILED (failures=3, errors=1)
+[B2-01] match_count=5/5 mapping={'IN_PROGRESS': 60, 'SUCCEEDED': 900, 'FAILED_RETRYABLE': 300, 'FAILED_FINAL': 900, 'UNKNOWN': 172800}
+[TTL=60s state=IN_PROGRESS] before=IN_PROGRESS boundary=IN_PROGRESS after=UNKNOWN latency_sec(min/median/p95/max)=0.0037545000013778917/0.00583829999959562/0.007817400001658825/0.00803730000188807 n=3
+[B2-02] post-transition try_create retry_result=('DUPLICATE_BLOCKED', 'UNKNOWN') row_count=1
+[TTL=900s state=SUCCEEDED] before=SUCCEEDED boundary=SUCCEEDED after=EXPIRED latency_sec(min/median/p95/max)=0.0037159999992582016/0.003827399999863701/0.005820990000938764/0.006042500001058215 n=3
+[TTL=300s state=FAILED_RETRYABLE] before=FAILED_RETRYABLE boundary=FAILED_RETRYABLE after=EXPIRED latency_sec(min/median/p95/max)=0.003976199997850927/0.004099000001588138/0.0057726400023966565/0.005958600002486492 n=3
+[TTL=900s state=FAILED_FINAL] before=FAILED_FINAL boundary=FAILED_FINAL after=EXPIRED latency_sec(min/median/p95/max)=0.0037443000001076143/0.004002100002253428/0.004629309997835662/0.004698999997344799 n=3
+[TTL=172800s state=UNKNOWN] before=UNKNOWN boundary=UNKNOWN after=EXPIRED latency_sec(min/median/p95/max)=0.0037908999984210823/0.0038103000006231014/0.004887689999304712/0.005007399999158224 n=3
+[B2-07] workers=8 CREATED=1 DUPLICATE_BLOCKED=7 errors=0 row_count=1 elapsed_sec=0.160518 throughput_ops_per_sec=49.838678427816426 latency_sec(min/median/p95/max)=0.015362899997853674/0.05775499999981548/0.14743125500190216/0.15890240000226186 n=8
+[B2-08] distinct_keys=8 CREATED=8 total_rows=8 unique_keys_in_db=8 elapsed_sec=0.154869 throughput_ops_per_sec=51.656527997234896 latency_sec(min/median/p95/max)=0.013061500001640525/0.06617559999904188/0.14160954000089984/0.1533071000012569 n=8
+[B2-09a] key=dr-b-02-5282084b-c091-4b88-bd81-b13f286820d4 nonces=5 row_counts=[1, 1, 1, 1, 1] terminal=SUCCEEDED elapsed_sec=0.042518 throughput_ops_per_sec=94.07846614527487 latency_sec(min/median/p95/max)=0.00501079999958165/0.005341300002328353/0.006197480000992073/0.0063306000010925345 n=5
+[B2-09b] key=dr-b-02-62a98326-b808-4df0-a38f-d04fcdc2b71b nonces=5 row_counts=[1, 1, 1, 1, 1] terminal=FAILED_FINAL elapsed_sec=0.042377 throughput_ops_per_sec=94.39127069516049 latency_sec(min/median/p95/max)=0.005031000000599306/0.005636699999740813/0.006186139999772422/0.006291199999395758 n=5
+[B2-10] burst_count=30 CREATED=1 DUPLICATE_BLOCKED=29 errors=0 elapsed_sec=1.877403 throughput_ops_per_sec=15.979523199791304 latency_sec(min/median/p95/max)=0.01584799999909592/0.3982713999994303/1.6969354100001508/1.8660956999992777 n=30
+[B2-11] guard_max=3 total_requested=10 processed=3 aborted_early=True row_count_after_abort=3 elapsed_sec=0.019064 throughput_ops_per_sec=157.36631732542523 latency_sec(min/median/p95/max)=0.006135100000392413/0.006306499999482185/0.0065171900027053194/0.006540600003063446 n=3
+[policy-unresolved] state=SUCCEEDED try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'SUCCEEDED') row_count_for_key=1 raw_state_after=SUCCEEDED
+[policy-unresolved] state=FAILED_RETRYABLE try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'FAILED_RETRYABLE') row_count_for_key=1 raw_state_after=FAILED_RETRYABLE
+[policy-unresolved] state=FAILED_FINAL try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'FAILED_FINAL') row_count_for_key=1 raw_state_after=FAILED_FINAL
+[policy-unresolved] state=UNKNOWN try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'UNKNOWN') row_count_for_key=1 raw_state_after=UNKNOWN
+---- END OUTPUT ----
+exit_code=1

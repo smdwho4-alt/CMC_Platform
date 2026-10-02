@@ -1,0 +1,49 @@
+python_version=Python 3.14.2
+command=python3 -X utf8 -m unittest -v sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate
+cwd=<SCRATCHPAD>
+---- BEGIN OUTPUT ----
+test_b2_01_state_ttl_mapping_unit_check (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_01_state_ttl_mapping_unit_check) ... ok
+test_b2_02_in_progress_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_02_in_progress_ttl_boundary)
+TTL 경계 검증(PASS 대상) + ADR-017 14/16/23절 정책 검증(POLICY ... ok
+test_b2_02b_in_progress_direct_try_create_path_a (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_02b_in_progress_direct_try_create_path_a)
+경로 A: read_state()를 전혀 호출하지 않고, 아직 원시 state가 ... ok
+test_b2_03_succeeded_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_03_succeeded_ttl_boundary) ... ok
+test_b2_04_failed_retryable_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_04_failed_retryable_ttl_boundary) ... ok
+test_b2_05_failed_final_ttl_boundary (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_05_failed_final_ttl_boundary) ... ok
+test_b2_06_unknown_ttl_boundary_48h (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_06_unknown_ttl_boundary_48h) ... ok
+test_b2_07_concurrent_same_key_exactly_one_created (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_07_concurrent_same_key_exactly_one_created) ... ok
+test_b2_08_concurrent_distinct_keys_no_cross_contamination (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_08_concurrent_distinct_keys_no_cross_contamination) ... ok
+test_b2_09a_retry_convergence_to_succeeded (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_09a_retry_convergence_to_succeeded) ... ok
+test_b2_09b_retry_convergence_to_failed_final (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_09b_retry_convergence_to_failed_final) ... ok
+test_b2_10_synthetic_burst_retry_storm (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_10_synthetic_burst_retry_storm) ... ok
+test_b2_11_time_work_guard_partial_result_preserved (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_11_time_work_guard_partial_result_preserved) ... ok
+test_b2_12_repeat_full_b2_02_to_b2_10_stability_and_cleanup (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_b2_12_repeat_full_b2_02_to_b2_10_stability_and_cleanup)
+Plan section 7, B2-12: repeat the B2-02~B2-10 patterns 3 times, as ... ok
+test_policy_unresolved_states_block_without_mutation (sprint8_dr_b_02_phase1_idempotency_ttl_harness_candidate.DrB02Phase1IdempotencyTtl.test_policy_unresolved_states_block_without_mutation)
+SUCCEEDED/FAILED_RETRYABLE/FAILED_FINAL/UNKNOWN의 만료 후 전이 ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 10.285s
+
+OK
+[B2-01] match_count=5/5 mapping={'IN_PROGRESS': 60, 'SUCCEEDED': 900, 'FAILED_RETRYABLE': 300, 'FAILED_FINAL': 900, 'UNKNOWN': 172800}
+[TTL=60s state=IN_PROGRESS] before=IN_PROGRESS boundary=IN_PROGRESS after=UNKNOWN latency_sec(min/median/p95/max)=0.004576400002406444/0.005598300002020551/0.008667659999264287/0.009008699998958036 n=3
+[B2-02-path-B(read_state 선행)] retry_result=('RECONCILIATION_REQUIRED_BLOCKED', 'UNKNOWN') row_count=1 state_after=UNKNOWN
+[B2-02-path-A(직접 호출)] retry_result=('RECONCILIATION_REQUIRED_BLOCKED', 'UNKNOWN') row_count=1 state_after=UNKNOWN
+[TTL=900s state=SUCCEEDED] before=SUCCEEDED boundary=SUCCEEDED after=EXPIRED latency_sec(min/median/p95/max)=0.0036652999988291413/0.0037728999996033963/0.004601889999321429/0.004693999999290099 n=3
+[TTL=300s state=FAILED_RETRYABLE] before=FAILED_RETRYABLE boundary=FAILED_RETRYABLE after=EXPIRED latency_sec(min/median/p95/max)=0.003759799998078961/0.003958599998441059/0.005479149999155197/0.005648099999234546 n=3
+[TTL=900s state=FAILED_FINAL] before=FAILED_FINAL boundary=FAILED_FINAL after=EXPIRED latency_sec(min/median/p95/max)=0.003908800001227064/0.003973999999288935/0.004749259999152855/0.004835399999137735 n=3
+[TTL=172800s state=UNKNOWN] before=UNKNOWN boundary=UNKNOWN after=EXPIRED latency_sec(min/median/p95/max)=0.003962899998441571/0.004310299998905975/0.005192749999696389/0.0052907999997842126 n=3
+[B2-07] workers=8 CREATED=1 DUPLICATE_BLOCKED=7 errors=0 row_count=1 elapsed_sec=0.167160 throughput_ops_per_sec=47.858253425142394 latency_sec(min/median/p95/max)=0.009594300001481315/0.05946475000018836/0.15259824500026295/0.16492640000069514 n=8
+[B2-08] distinct_keys=8 CREATED=8 total_rows=8 unique_keys_in_db=8 elapsed_sec=0.161971 throughput_ops_per_sec=49.39149676014858 latency_sec(min/median/p95/max)=0.022354400000040187/0.07497379999949771/0.1487101699982304/0.15898539999761852 n=8
+[B2-09a] key=dr-b-02-4b17f3e5-3bf7-4a1f-af1c-0866ef9dff8a initial_request_count=1 retry_count=4 total_request_count=5 unique_nonces=5 row_counts=[1, 1, 1, 1, 1] terminal=SUCCEEDED elapsed_sec=0.041365 throughput_ops_per_sec=120.87630485520113 latency_sec(min/median/p95/max)=0.004794999997102423/0.004977399999916088/0.005891799998789793/0.006079499999032123 n=5
+[B2-09b] key=dr-b-02-45311f86-1928-4911-b309-ee41d08284d2 initial_request_count=1 retry_count=4 total_request_count=5 unique_nonces=5 row_counts=[1, 1, 1, 1, 1] terminal=FAILED_FINAL elapsed_sec=0.039319 throughput_ops_per_sec=127.16595411060212 latency_sec(min/median/p95/max)=0.004482000000280095/0.004669399997510482/0.006133419999969192/0.006457999999838648 n=5
+[B2-10] burst_count=30 CREATED=1 DUPLICATE_BLOCKED=29 errors=0 elapsed_sec=1.986160 throughput_ops_per_sec=15.104524822230937 latency_sec(min/median/p95/max)=0.0233431999986351/0.39937115000066115/1.8111470700001515/1.9776974999986123 n=30
+[B2-11] guard_max=3 total_requested=10 processed=3 aborted_early=True row_count_after_abort=3 elapsed_sec=0.023701 throughput_ops_per_sec=126.57800580373632 latency_sec(min/median/p95/max)=0.006056800000806106/0.007394799999019597/0.009891490000154591/0.0101689000002807 n=3
+[B2-12] repeats=3 distinct_outcome_patterns=1 row_counts_before_cleanup=[17, 17, 17] cleanup_flags=[True, True, True] elapsed_sec_total=7.490863 ops_measured=216 throughput_ops_per_sec=28.835129646209182 latency_sec_min=0.001806899999792222 latency_sec_median=0.049576400000660215 latency_sec_p95=1.6335848499993517 latency_sec_max=2.092919900002016 n=216 (observation only, not a pass/fail criterion - plan section 8)
+[policy-unresolved] state=SUCCEEDED try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'SUCCEEDED') row_count_for_key=1 raw_state_after=SUCCEEDED
+[policy-unresolved] state=FAILED_RETRYABLE try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'FAILED_RETRYABLE') row_count_for_key=1 raw_state_after=FAILED_RETRYABLE
+[policy-unresolved] state=FAILED_FINAL try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'FAILED_FINAL') row_count_for_key=1 raw_state_after=FAILED_FINAL
+[policy-unresolved] state=UNKNOWN try_create_result=('POLICY_UNRESOLVED_BLOCKED', 'UNKNOWN') row_count_for_key=1 raw_state_after=UNKNOWN
+---- END OUTPUT ----
+exit_code=0
