@@ -629,12 +629,81 @@ def reconcile_expired_in_progress(
         raise IdempotencyError(f"저장소 트랜잭션 오류: {e}") from e
 
 
+def mark_unknown(
+    conn: sqlite3.Connection,
+    *,
+    key: str,
+    now: Optional[datetime] = None,
+    correlation_id: Optional[str] = None,
+) -> IdempotencyResult:
+    """오케스트레이션 계층(예: `gas_orchestration.py`)이 "GAS 요청을 보냈으나
+    결과를 확정할 수 없다"(요청 전송 후 timeout/연결오류, 또는 GAS 응답은
+    받았으나 그 결과를 로컬에 기록하는 데 실패한 경우 포함)고 판단한 **즉시**
+    호출하는 명시적 전이 메서드다.
+
+    `reconcile_expired_in_progress()`와의 차이: 그 함수는 **IN_PROGRESS TTL
+    (60초)이 실제로 경과했을 때만** 동작하는 시간 기반 지연 전이이고, 이
+    함수는 **TTL 경과 여부와 무관하게 즉시** IN_PROGRESS를 UNKNOWN으로
+    전이시킨다 — "불확실성을 감지한 순간 바로 기록한다"는 요구사항(60초를
+    기다리지 않음)을 만족하기 위함이다.
+
+    현재 raw state가 정확히 "IN_PROGRESS"가 아니면 ValueError를 낸다(이미
+    다른 상태로 전이된 레코드를 되돌리거나 덮어쓰지 않는다). 트랜잭션 실패
+    시 rollback 후 IdempotencyError로 전파한다 — **호출부는 이 실패를 GAS
+    재호출 신호로 쓰지 않아야 한다**(기존 IN_PROGRESS+TTL 안전망에 맡긴다,
+    오케스트레이션 계층의 책임)."""
+    _validate_key(key)
+    now_dt = now or datetime.now(KST)
+    ts = now_dt.isoformat(timespec="seconds")
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT state FROM idempotency_store WHERE key = ?", (key,)
+        ).fetchone()
+        if row is None:
+            conn.execute("ROLLBACK")
+            raise ValueError(
+                f"존재하지 않는 key를 UNKNOWN으로 표시할 수 없음: key_fp={_key_fingerprint_for_log(key)}"
+            )
+        if row["state"] != "IN_PROGRESS":
+            conn.execute("ROLLBACK")
+            raise ValueError(
+                f"IN_PROGRESS가 아닌 레코드(state={row['state']!r})는 mark_unknown() 대상이 아님"
+            )
+        conn.execute(
+            "UPDATE idempotency_store SET state = 'UNKNOWN', updated_at = ? WHERE key = ?",
+            (ts, key),
+        )
+        conn.execute("COMMIT")
+        result = IdempotencyResult(classification="MARKED_UNKNOWN", state="UNKNOWN")
+    except sqlite3.OperationalError as e:
+        try:
+            conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise IdempotencyError(f"저장소 트랜잭션 오류: {e}") from e
+    finally:
+        _emit_metric(
+            {
+                "ts": now_iso(),
+                "op": "mark_unknown",
+                "correlation_id": correlation_id,
+                "key_fp": _key_fingerprint_for_log(key),
+                "classification": locals().get("result").classification
+                if "result" in locals()
+                else "ERROR",
+            }
+        )
+    return result
+
+
 def reconcile_unknown(
     conn: sqlite3.Connection,
     *,
     key: str,
     resolved_state: str,
     performed_by: str,
+    result: Optional[str] = None,
     now: Optional[datetime] = None,
     correlation_id: Optional[str] = None,
 ) -> IdempotencyResult:
@@ -646,12 +715,18 @@ def reconcile_unknown(
     구조로도 드러낸다.
 
     현재 raw state가 "UNKNOWN"이 아니면 ValueError를 낸다. resolved_state는
-    SUCCEEDED 또는 FAILED_FINAL만 허용한다(ADR-017 §23 원문 그대로)."""
+    SUCCEEDED 또는 FAILED_FINAL만 허용한다(ADR-017 §23 원문 그대로).
+    `result`(선택)는 운영자가 Sheets를 직접 확인한 뒤 남기는 비식별 요약값
+    으로, `record_outcome()`과 동일하게 상태 전이와 같은 트랜잭션으로
+    기록된다 — 수동 조정 후에도 `get_completed_result()`로 재조회 가능하게
+    하기 위한 확장이다(원래 요청사항에는 없었으나, record_outcome과의
+    일관성을 위해 이번 STEP에서 추가)."""
     _validate_key(key)
     if resolved_state not in _FINAL_STATES:
         raise ValueError("resolved_state는 SUCCEEDED 또는 FAILED_FINAL만 허용함(ADR-017 §23)")
     if not performed_by:
         raise ValueError("performed_by(운영자 식별자)가 필요함 — 자동 호출 금지")
+    result = _validate_result(result)
     now_dt = now or datetime.now(KST)
     ts = now_dt.isoformat(timespec="seconds")
     try:
@@ -663,11 +738,11 @@ def reconcile_unknown(
             conn.execute("ROLLBACK")
             raise ValueError("UNKNOWN 상태의 레코드에만 reconcile_unknown()을 적용할 수 있음")
         conn.execute(
-            "UPDATE idempotency_store SET state = ?, updated_at = ? WHERE key = ?",
-            (resolved_state, ts, key),
+            "UPDATE idempotency_store SET state = ?, result = ?, updated_at = ? WHERE key = ?",
+            (resolved_state, result, ts, key),
         )
         conn.execute("COMMIT")
-        result = IdempotencyResult(classification="RECONCILED", state=resolved_state)
+        result_obj = IdempotencyResult(classification="RECONCILED", state=resolved_state, result=result)
     except sqlite3.OperationalError as e:
         try:
             conn.execute("ROLLBACK")
@@ -682,9 +757,9 @@ def reconcile_unknown(
                 "correlation_id": correlation_id,
                 "key_fp": _key_fingerprint_for_log(key),
                 "performed_by_present": bool(performed_by),
-                "classification": locals().get("result").classification
-                if "result" in locals()
+                "classification": locals().get("result_obj").classification
+                if "result_obj" in locals()
                 else "ERROR",
             }
         )
-    return result
+    return result_obj
