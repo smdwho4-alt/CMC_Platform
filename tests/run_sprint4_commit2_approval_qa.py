@@ -89,16 +89,21 @@ for k, v in (("예약접수", "REQUESTED"), ("예약확정", "CONFIRMED"), ("검
 
 
 # ── 1. Backend 통합 테스트(TestClient, GAS monkeypatch) ──
+# client: 인증 없이 app.routes만 읽는 등 비-HTTP 용도로만 남김(아래 (14)).
 client = TestClient(create_app(SANDBOX, include_agents=False))
 
-STAFF = {"X-User-Id": "USR-0002"}      # ROLE-STAFF: reservation:approve 보유(client의 조회용 Mock 유지)
-DIRECTOR = {"X-User-Id": "USR-0001"}   # ROLE-DIRECTOR: reservation:approve 미보유(client의 _audit_count_for() Mock 유지)
-CRM_USER = {"X-User-Id": "USR-0003"}   # ROLE-CRM: reservation:approve 미보유
-
-# Sprint8 Commit8-2c STEP2: 승인/거절(상태변경)은 Mock이 차단된다. 조회(_audit_count_for
-# 등)는 계속 Mock(client, DIRECTOR)을 쓰되, 상태변경 호출은 역할별 별도 세션 client로
-# 분리한다 — 한 client에서 세션 로그인을 하면 이후 Mock 헤더보다 세션 Cookie가 항상
-# 우선돼 다른 역할을 Mock으로 흉내내려는 호출이 실제로는 로그인된 신원으로 나간다.
+# Sprint8 Commit8-2c STEP2: 승인/거절(상태변경)은 Mock(X-User-Id)이 차단된다.
+# 이번 재검토(Commit8-3b 커밋 전)에서 추가로 확인: `/api/audit-logs` 조회도
+# Sprint8 Commit8-2c 이후 `require_user`가 세션만 신뢰하도록 바뀌어 Mock으로는
+# 401("로그인이 필요합니다")을 받는다 — 승인/거절 자체는 그 전부터 이미 세션
+# 기반(아래 client_staff/client_director_approve/client_crm)이었는데
+# `_audit_count_for()`만 낡은 Mock(STAFF/DIRECTOR/CRM_USER 헤더)을 그대로 쓰고
+# 있어서 이 QA 스크립트만 깨져 있었다. 운영 인증(require_user/require_session_user)
+# 자체는 바꾸지 않았다 — 이 스크립트가 조회에도 실제 세션(client_director_approve,
+# DIRECTOR 역할은 audit:view/reservation:view 보유, data/roles.json 확인)을 쓰도록만
+# 맞췄다. 한 client에서 세션 로그인을 하면 이후 Mock 헤더보다 세션 Cookie가 항상
+# 우선돼 다른 역할을 Mock으로 흉내내려는 호출이 실제로는 로그인된 신원으로 나가므로,
+# 상태변경 호출은 여전히 역할별 별도 세션 client로 분리한다(기존 설계 유지).
 from _step2_session_helper import ensure_session  # noqa: E402
 client_staff = TestClient(create_app(SANDBOX, include_agents=False))
 STAFF_CSRF = ensure_session(
@@ -147,7 +152,7 @@ sheets.get_reservation = _fake_get_reservation
 
 
 def _audit_count_for(no: str) -> int:
-    r = client.get("/api/audit-logs", headers=DIRECTOR)
+    r = client_director_approve.get("/api/audit-logs")
     body = r.json()
     return sum(1 for rec in body.get("records", []) if rec.get("entityId") == no)
 
@@ -215,22 +220,51 @@ r = client_staff.post("/api/admin/reservations/20260728-1008/approve", headers=S
 check("(8) 이미 거절된 건 승인 시도 → 409(종결 상태에서 전환 불가)", r.status_code == 409, str(r.status_code))
 
 # 9) GAS 실패 시 상태·Audit 일관성 + 11) 실패 시 성공 Audit 미생성
+# Sprint8 Commit8-3b(2026-10-04, 이번 커밋 전 재검토로 기대값 갱신): GAS 예외는
+# 더 이상 "확정 실패"(502)로 단정하지 않고, gas_orchestration의 idempotency
+# 실행권 판정을 거쳐 "결과 불확실"(409, code=APPROVAL_RESULT_UNKNOWN)로
+# 분류한다 — ADR-017 §12/§14의 기존 설계(UNKNOWN/RECONCILIATION_REQUIRED는
+# 자동 재시도 금지, 재확인 절차 우선)와 일치하며, 같은 §12가 나열하는
+# 19개 오류코드 중 IDEMPOTENCY_CONFLICT/UNKNOWN류에 ADR이 고정 HTTP
+# status를 못박지 않았으므로(docs/Sprint8_Admin_Operations_API_Contract.md
+# §129/§145 대조 확인, 409 숫자 충돌 없음) 409로 통일하는 것이 기존 계약과
+# 충돌하지 않는다. 되돌리지 않는다 — 이게 이번 통합의 핵심 안전장치다.
 sheets_write.update_status = _fake_update_status_gas_error
 _reset_fake_reservation("20260728-1009", "예약접수")
 before_count = _audit_count_for("20260728-1009")
 r = client_staff.post("/api/admin/reservations/20260728-1009/approve", headers=STAFF_CSRF)
-check("(9) GAS 오류 시 502 반환", r.status_code == 502, str(r.status_code))
+check("(9) GAS 오류(결과불확실) 시 409 반환(Commit8-3b: 502→409, APPROVAL_RESULT_UNKNOWN)",
+      r.status_code == 409 and r.json().get("detail", {}).get("code") == "APPROVAL_RESULT_UNKNOWN",
+      str(r.status_code) + " " + r.text)
 check("(9) GAS 오류 시 로컬 상태(Fake Sheets)도 변경되지 않음(일관성)",
       _FAKE_DB["20260728-1009"]["status"] == "예약접수")
+check("(9) UNKNOWN 응답 메시지가 '확정 실패'로 표현되지 않음(재확인 안내 문구)",
+      "확인할 수 없습니다" in r.json().get("detail", {}).get("message", "")
+      and "거절" not in r.json().get("detail", {}).get("message", ""),
+      r.json().get("detail", {}).get("message", ""))
+# Sprint8 Commit8-3b(2026-10-04): "성공 Audit 미생성"이 아니라 "성공 Audit
+# 미생성 + 대신 RESERVATION_APPROVAL_RESULT_UNKNOWN Audit 1건 생성"으로
+# 기대값을 바꾼다 — ADR-017의 재확인(Reconciliation) 원칙상 결과가 불확실한
+# 시도도 운영자가 나중에 추적할 수 있어야 하므로, 이번 통합이 의도적으로
+# 그 이벤트를 Audit에 남긴다(§ADR-017 §12 line 141 "append_audit() 호출 시
+# action 인자로 전달하는 연계 코드는 Commit8-3b에서 구현" 확인).
 after_count = _audit_count_for("20260728-1009")
-check("(11) GAS 실패 시 Audit 레코드 생성되지 않음", after_count == before_count,
+check("(11) GAS 결과불확실 시 성공(RESERVATION_APPROVED) Audit은 생성되지 않되,"
+      " RESERVATION_APPROVAL_RESULT_UNKNOWN Audit 1건은 생성됨(Commit8-3b 재확인 추적)",
+      after_count == before_count + 1,
       f"before={before_count} after={after_count}")
+r_audit = client_director_approve.get("/api/audit-logs")
+_unk_recs = [x for x in r_audit.json().get("records", [])
+             if x.get("entityId") == "20260728-1009"]
+check("(11) 생성된 Audit의 action=RESERVATION_APPROVAL_RESULT_UNKNOWN(성공 Audit 아님)",
+      len(_unk_recs) == 1 and _unk_recs[0].get("action") == "RESERVATION_APPROVAL_RESULT_UNKNOWN",
+      str(_unk_recs))
 sheets_write.update_status = _fake_update_status  # 원복
 
 # 10) 성공 시 Audit 생성(예약번호/이전상태/변경상태/처리자/처리시각/거절사유)
 _reset_fake_reservation("20260728-1010", "예약접수")
 client_staff.post("/api/admin/reservations/20260728-1010/approve", headers=STAFF_CSRF)
-r = client.get("/api/audit-logs", headers=DIRECTOR)
+r = client_director_approve.get("/api/audit-logs")
 recs = [x for x in r.json().get("records", []) if x.get("entityId") == "20260728-1010"]
 check("(10) 승인 성공 시 Audit 1건 생성", len(recs) == 1, str(len(recs)))
 if recs:
@@ -244,7 +278,7 @@ if recs:
 
 _reset_fake_reservation("20260728-1011", "예약접수")
 client_staff.post("/api/admin/reservations/20260728-1011/reject", headers=STAFF_CSRF, json={"reason": "정원 초과로 거절"})
-r = client.get("/api/audit-logs", headers=DIRECTOR)
+r = client_director_approve.get("/api/audit-logs")
 recs = [x for x in r.json().get("records", []) if x.get("entityId") == "20260728-1011"]
 check("(10) 거절 성공 시 Audit 1건 생성", len(recs) == 1, str(len(recs)))
 if recs:

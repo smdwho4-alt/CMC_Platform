@@ -23,6 +23,7 @@ Sprint 3 Commit 1(RBAC): 인증 위에 권한(Role Check)을 추가했다. 모�
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -30,7 +31,7 @@ from typing import Any
 
 _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parents[1]
-for _p in ("core", "services", "reservation", "auth"):
+for _p in ("core", "services", "reservation", "auth", "idempotency"):
     sys.path.insert(0, str(_ROOT / "src" / _p))
 sys.path.insert(0, str(_HERE))  # file_lock.py, reservation_approval_states.py (같은 src/api/ 디렉터리)
 
@@ -38,6 +39,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query  # noqa: E402
 from pydantic import BaseModel, field_validator  # noqa: E402
 
 import core_data_loader as loader  # noqa: E402
+import gas_orchestration  # noqa: E402 - Sprint8 Commit8-3b: 승인/거절 GAS 쓰기의 idempotency 실행권 판정(이번 최소 통합)
+import idempotency_store as idem_store  # noqa: E402 - 위와 동일 목적, SQLite Primary 저장소(기존 모듈 재사용)
 import pii_mask  # noqa: E402
 import reservation_approval_states as approval_states  # noqa: E402
 import reservation_audit as audit  # noqa: E402
@@ -47,6 +50,11 @@ import sheets_write_service as sheets_write  # noqa: E402
 from file_lock import DataLock  # noqa: E402
 from json_store import now_iso, read_doc, write_doc  # noqa: E402
 from routes_auth import build_require_csrf, build_require_session_user  # noqa: E402
+
+# Sprint8 Commit8-3b: 승인/거절 상태값(한글)은 idempotency key의 안전 문자 집합
+# (idempotency_store._SAFE_TOKEN_RE, [A-Za-z0-9_.\-:])에 들어가지 않으므로 ASCII
+# 태그로만 변환한다 — approval_states.py의 상태 문자열 자체는 수정하지 않는다.
+_APPROVAL_ACTION_TAG = {"예약확정": "approve", "거절": "reject"}
 
 
 def _build_require_user(data_dir: Path):
@@ -272,6 +280,10 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
     # 대상: 승인/거절/상태변경). require_user 객체를 재사용해 세션 검증 중복 없음.
     require_csrf_reservation_approve = build_require_csrf(require_reservation_approve.require_user)
     require_csrf_consultation_manage = build_require_csrf(require_consultation_manage.require_user)
+    # Sprint8 Commit8-3b: 승인/거절 idempotency 저장소 스키마를 라우터 생성
+    # 시점에 1회만 보장한다(요청마다 반복하지 않음, auth_store.py 등 기존
+    # house convention과 동일한 init_schema 1회 호출 패턴).
+    idem_store.init_schema(data_dir)
 
     @router.get("/dashboard")
     def dashboard(user: dict[str, Any] = Depends(require_dashboard_view)):
@@ -726,22 +738,97 @@ def create_admin_namespace_router(data_dir: Path) -> APIRouter:
 
         # 3) Sprint 4 Commit 3 — 승인(예약확정)일 때만 Slot 조회·점유. Google Sheets
         #    쓰기 전에 Slot 확보가 끝나 있어야 한다(PM 원칙: Slot 확보 → Sheets 쓰기).
+        # Sprint8 Commit8-3b 커밋 전 재검토: "idempotency 실행권 획득 → 슬롯
+        # 변경 → GAS 쓰기" 순서가 아니라 "슬롯 변경 → idempotency+GAS 쓰기"
+        # 순서인 것을 의도적으로 유지한다 — 슬롯 변경을 아래 4)의
+        # gas_adapter 안으로 옮기면(재구조화 가능해 보였으나) 슬롯 검증
+        # 실패(SLOT_FULL 등, GAS를 부르지도 않은 로컬 실패)가
+        # gas_orchestration의 "adapter 예외는 전부 SENT_UNCERTAIN"
+        # 규칙(그 모듈 docstring, 네트워크 불확실성과 구분하지 않는 의도된
+        # 설계)에 걸려 "GAS 결과 불확실"로 오분류되고 idempotency key가
+        # 불필요하게 소모된다 — 현재 순서보다 더 나쁜 결함이라 재구조화하지
+        # 않았다. 현재 순서의 창(슬롯 선점 후 드물게 롤백)은 바로 위 1)의
+        # 기존 comment가 가리키는, 이미 알려진 좁은 경쟁조건이며 이번
+        # 통합이 새로 만든 것이 아니다 — 동시 중복요청은 이 함수 자체의
+        # DataLock+"이미 점유된 예약번호" 체크로 idempotency 계층 도달
+        # 전에 이미 직렬화·차단된다(검증: test_scenario7_concurrent_*).
         slot_id: str | None = None
         if target_status == "예약확정":
             slot_id = _reserve_slot_for_approval(current, user)
 
         # 4) write — GAS 기존 updateStatus action만 사용(신규 action 없음, GAS 무수정).
-        try:
-            sheets_write.update_status(reservation_no, target_status)
-        except sheets_write.SheetsIntegrationNotConfigured as e:
+        # Sprint8 Commit8-3b(이번 최소 통합, 2026-10-04): 기존에는 "성공 아니면
+        # 확정 실패(+Slot Rollback)"만 구분했다. idempotency 실행권 판정
+        # (gas_orchestration.execute_with_idempotency — 기존 모듈 재사용, 이번에
+        # 새로 작성하지 않음)으로 감싸 아래를 추가로 구분한다 —
+        #   (a) 전송 후 결과를 알 수 없는 경우(SENT_UNCERTAIN, 예: timeout) —
+        #       Slot을 되돌리지 않는다. GAS에 실제로는 이미 반영됐을 수 있는
+        #       변경을 로컬 Slot 해제로 되돌리면 이중 예약 위험이 생기기
+        #       때문이다(바로 위 1)의 기존 comment "경쟁조건을 완전히 없애지는
+        #       못한다"가 가리키는 틈을 메우는 것이 이번 작업 목적). 같은
+        #       key로 재요청해도 idempotency_store가 UNKNOWN 상태로 막는다.
+        #   (b) 동일 요청(동일 reservation_no+action+payload)의 중복/동시
+        #       재전송 — GAS를 다시 호출하지 않는다(NOT_SENT_BLOCKED/CACHED).
+        # update_status()가 던지는 예외(SheetsIntegrationError 등)는 네트워크
+        # 실패와 GAS측 확정 거부를 구분하지 않으므로(그 함수 자체의 기존 설계,
+        # 이번에 바꾸지 않음) 더 세밀한 재분류를 새로 만들지 않고 전부
+        # SENT_UNCERTAIN으로 취급한다 — gas_orchestration 모듈 docstring의
+        # 설계 원칙과 일치.
+        action_tag = _APPROVAL_ACTION_TAG[target_status]
+        idem_key = f"admin_approval:{reservation_no}:{action_tag}"
+        idem_fingerprint = hashlib.sha256(
+            f"{current_status}|{target_status}|{reason or ''}".encode("utf-8")
+        ).hexdigest()
+
+        with idem_store.connect(data_dir) as idem_conn:
+            orchestration = sheets_write.update_status_idempotent(
+                reservation_no, target_status,
+                idempotency_key=idem_key, fingerprint=idem_fingerprint, conn=idem_conn,
+            )
+
+        if orchestration.outcome == "SENT_SUCCESS":
+            pass  # 기존 성공 경로와 동일 — 아래 Audit·응답으로 계속
+        elif orchestration.outcome == "NOT_SENT_PREP_FAILED":
+            # CSHSP_GAS_WEBAPP_URL 미설정 등 — prepare_dispatch 단계에서 걸러져
+            # 네트워크 시도 자체가 없었음이 구조적으로 보장된다(gas_orchestration
+            # 모듈 docstring 참조). 기존 동작(Slot Rollback+503)을 그대로 유지.
             if slot_id:
-                _safe_rollback_slot(slot_id, user, reservation_no, e)
-            raise HTTPException(503, str(e)) from e
-        except sheets_write.SheetsIntegrationError as e:
-            # Sheets 쓰기 실패 시 Slot Rollback(PM 필수 구현 사항).
+                _safe_rollback_slot(
+                    slot_id, user, reservation_no, RuntimeError(orchestration.detail or "PREP_FAILED")
+                )
+            raise HTTPException(503, "GAS 연동 설정 오류(CSHSP_GAS_WEBAPP_URL 미설정 등)")
+        elif orchestration.outcome in ("NOT_SENT_BLOCKED", "NOT_SENT_CACHED"):
+            # 동일 요청의 동시/중복 재전송 — 실제 처리는 다른 요청이 담당
+            # 중이거나 이미 끝났다. 이번 호출이 새로 잡은 Slot Hold가 있다면
+            # (원래 처리분과 별개이므로) 되돌린다.
             if slot_id:
-                _safe_rollback_slot(slot_id, user, reservation_no, e)
-            raise HTTPException(502, {"code": "SHEETS_WRITE_FAILED", "message": str(e)}) from e
+                _safe_rollback_slot(
+                    slot_id, user, reservation_no, RuntimeError(f"idempotency_{orchestration.outcome}")
+                )
+            raise HTTPException(
+                409,
+                {"code": f"APPROVAL_{orchestration.outcome}",
+                 "message": "동일한 승인/거절 요청이 이미 처리 중이거나 완료되었습니다."},
+            )
+        else:
+            # SENT_UNCERTAIN (그리고 이 adapter 경로에서는 실제로 발생하지 않는
+            # SENT_FAILED_* 방어적 분기 포함 — update_status()는 실패를 항상
+            # 예외로만 알리므로 GasResponse(success=False)가 만들어지지 않는다).
+            # Slot은 의도적으로 보존한다(위 설명 참조). 같은 key의 재요청은
+            # idempotency_store가 UNKNOWN으로 차단한다(별도 시나리오로 검증).
+            audit.append_audit(
+                data_dir, "RESERVATION_APPROVAL_RESULT_UNKNOWN", "Reservation", reservation_no,
+                user.get("id"), before={"status": current_status},
+                after={"attemptedStatus": target_status, "slotId": slot_id},
+                channel="ADMIN_PORTAL", note=f"idempotency outcome={orchestration.outcome}",
+            )
+            raise HTTPException(
+                409,
+                {"code": "APPROVAL_RESULT_UNKNOWN",
+                 "message": "GAS 처리 결과를 확인할 수 없습니다(timeout 등). Slot은 보존됐습니다 — "
+                            "관리자가 Sheets에서 실제 상태를 확인한 뒤 재조정해야 합니다. "
+                            "같은 요청을 즉시 재시도해도 차단됩니다."},
+            )
 
         # Audit은 Sheets 상태 변경 성공 이후에만 기록한다(PM Audit 원칙, Commit 2부터
         # 유지). 기존 reservation_engine.py::approve_reservation()과 동일하게 "쓰기

@@ -69,3 +69,63 @@ def update_status(reservation_no: str, status: str, *, session=None) -> dict[str
     if not status:
         raise ValueError("status는 필수입니다.")
     return _call_gas_write("updateStatus", {"no": reservation_no, "status": status}, session=session)
+
+
+def check_configured() -> None:
+    """GAS Web App URL이 설정됐는지만 확인한다(값은 반환하지 않음, 네트워크
+    요청 없음). `update_status_idempotent()`가 `gas_orchestration.
+    execute_with_idempotency(prepare_dispatch=...)`에 넘기는 용도로 Sprint8
+    Commit8-3b에서 추가했다 — 설정 오류를 "GAS에 도달했는지 알 수 없는 상태"
+    (SENT_UNCERTAIN)가 아니라 "네트워크 시도 자체가 없었던 상태"
+    (NOT_SENT_PREP_FAILED)로 정확히 분류하기 위함이다."""
+    _get_webapp_url()
+
+
+def update_status_idempotent(
+    reservation_no: str,
+    status: str,
+    *,
+    idempotency_key: str,
+    fingerprint: str,
+    conn: Any,
+    now: Any = None,
+    correlation_id: str | None = None,
+    session: Any = None,
+) -> Any:
+    """`update_status()`를 idempotency 실행권 판정으로 감싼 추가 진입점
+    (Sprint8 Commit8-3b, 기존 예약 승인/거절 흐름과의 최소 통합). 기존
+    `update_status()`는 무수정 — 이 함수는 호출부가 선택적으로 쓸 수 있는
+    새 래퍼일 뿐이며, 로직은 전부 이미 검증된 `gas_orchestration.
+    execute_with_idempotency()`/`idempotency_store.py`를 재사용한다(새
+    idempotency 로직을 여기서 다시 만들지 않는다).
+
+    `update_status()`가 던지는 예외(`SheetsIntegrationError` 등)는 네트워크
+    실패와 GAS측 확정 거부를 구분하지 않는다(그 함수 자체의 기존 설계, 이번
+    통합에서 바꾸지 않음) — 그래서 이 예외는 재분류하지 않고 그대로
+    `gas_orchestration`에 전파시켜 `SENT_UNCERTAIN`(결과 불확실)으로 취급한다
+    (모듈 docstring의 "예외 타입별로 세부 분류를 시도하지 않는다" 원칙과
+    일치). 반환값은 `gas_orchestration.OrchestrationResult`."""
+    try:  # 지연 import: 기존 update_status() 호출부에 새 모듈 의존성을 강제하지 않음
+        import gas_orchestration
+    except ImportError:
+        # 호출부(routes_admin_portal.py 등)가 이미 src/idempotency를 sys.path에
+        # 넣어뒀다면 이 분기는 타지 않는다 — 이 모듈을 단독으로 테스트/재사용할
+        # 때를 위한 안전망.
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "idempotency"))
+        import gas_orchestration
+
+    def _adapter(*, key: str, fingerprint: str):  # noqa: ARG001 - 콜러블 시그니처 고정(gas_orchestration)
+        update_status(reservation_no, status, session=session)
+        return gas_orchestration.GasResponse(success=True)
+
+    return gas_orchestration.execute_with_idempotency(
+        conn,
+        key=idempotency_key,
+        fingerprint=fingerprint,
+        gas_adapter=_adapter,
+        prepare_dispatch=check_configured,
+        now=now,
+        correlation_id=correlation_id,
+    )

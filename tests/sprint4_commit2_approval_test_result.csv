@@ -28,9 +28,11 @@ LEGACY_STATUS_MAP 기존 매핑 회귀 없음: 예약취소,PASS,
 (7) 예약확정 상태를 직접 거절 시도 → 409,PASS,409
 (8) 이미 거절된 건 재거절 시도 → 409,PASS,409
 (8) 이미 거절된 건 승인 시도 → 409(종결 상태에서 전환 불가),PASS,409
-(9) GAS 오류 시 502 반환,PASS,502
+"(9) GAS 오류(결과불확실) 시 409 반환(Commit8-3b: 502→409, APPROVAL_RESULT_UNKNOWN)",PASS,"409 {""detail"":{""code"":""APPROVAL_RESULT_UNKNOWN"",""message"":""GAS 처리 결과를 확인할 수 없습니다(timeout 등). Slot은 보존됐습니다 — 관리자가 Sheets에서 실제 상태를 확인한 뒤 재조정해야 합니다. 같은 요청을 즉시 재시도해도 차단됩니다.""}}"
 (9) GAS 오류 시 로컬 상태(Fake Sheets)도 변경되지 않음(일관성),PASS,
-(11) GAS 실패 시 Audit 레코드 생성되지 않음,PASS,before=0 after=0
+(9) UNKNOWN 응답 메시지가 '확정 실패'로 표현되지 않음(재확인 안내 문구),PASS,GAS 처리 결과를 확인할 수 없습니다(timeout 등). Slot은 보존됐습니다 — 관리자가 Sheets에서 실제 상태를 확인한 뒤 재조정해야 합니다. 같은 요청을 즉시 재시도해도 차단됩니다.
+"(11) GAS 결과불확실 시 성공(RESERVATION_APPROVED) Audit은 생성되지 않되, RESERVATION_APPROVAL_RESULT_UNKNOWN Audit 1건은 생성됨(Commit8-3b 재확인 추적)",PASS,before=0 after=1
+(11) 생성된 Audit의 action=RESERVATION_APPROVAL_RESULT_UNKNOWN(성공 Audit 아님),PASS,"[{'id': 'AUD-20261004-0003', 'timestamp': '2026-10-04T07:26:22+09:00', 'actorUserId': 'USR-0002', 'actorRole': 'ROLE-STAFF', 'action': 'RESERVATION_APPROVAL_RESULT_UNKNOWN', 'entityType': 'Reservation', 'entityId': '20260728-1009', 'before': {'status': '예약접수'}, 'after': {'attemptedStatus': '예약확정', 'slotId': 'SLOT-COMMIT2QA-0900-A'}, 'channel': 'ADMIN_PORTAL', 'note': 'idempotency outcome=SENT_UNCERTAIN'}]"
 (10) 승인 성공 시 Audit 1건 생성,PASS,1
 (10) Audit action=RESERVATION_APPROVED,PASS,
 (10) Audit actorUserId=처리자,PASS,

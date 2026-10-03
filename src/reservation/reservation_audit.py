@@ -29,6 +29,7 @@ AUDIT_EVENTS = [
     "RESERVATION_NO_SHOW",   # 확장
     "RESERVATION_COMPLETED", # 확장
     "SAFETY_BLOCKED",        # Sprint F: AI Safety Guard 차단 이력
+    "RESERVATION_APPROVAL_RESULT_UNKNOWN",  # Sprint8 Commit8-3b: 승인/거절 GAS 쓰기 결과 불확실(timeout 등)
 ]
 
 

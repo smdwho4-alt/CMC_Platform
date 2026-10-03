@@ -1021,8 +1021,16 @@
         var forbidden = throwIfForbidden(r); if (forbidden) return forbidden;
         // 거절은 Slot 점유 로직(_reserve_slot_for_approval)을 타지 않으므로
         // (target_status가 "예약확정"일 때만 호출됨, routes_admin_portal.py 확인)
-        // 409는 항상 기존 상태 전이 충돌 하나뿐이다 — _SLOT_CONFLICT_CODES 대상 아님,
-        // 기존 동작 그대로 유지(무수정, STEP1 "기존 흐름 변경 안 함").
+        // _SLOT_CONFLICT_CODES 대상 코드(SLOT_* 등)는 절대 나오지 않는다. 단
+        // Sprint8 Commit8-3b(2026-10-04) 이후로는 그 409가 "기존 상태 전이
+        // 충돌" 하나만이 아니다 — idempotency 판정에 따른 APPROVAL_RESULT_UNKNOWN/
+        // APPROVAL_NOT_SENT_CACHED/APPROVAL_NOT_SENT_BLOCKED도 409로 온다(거절도
+        // 승인과 동일하게 idempotency 계층을 거침, routes_admin_portal.py 확인).
+        // 둘 다 generic handleApprovalConflict() 문구("다른 사용자가 이미
+        // 처리했거나...")로 묶여도 의미상 틀리지 않지만(실제로 "확정 실패"라고
+        // 표현하지 않음), UNKNOWN 쪧의 더 구체적인 서버 안내 문구(Slot 보존·
+        // 재조정 필요)는 이 분기에서 버려진다 — UX 개선 여지(이번 범위 밖, 코드
+        // 수정 안 함).
         if (r.status === 409) { handleApprovalConflict(); return null; }
         if (r.status === 422) {
           // FastAPI Pydantic 자동 검증 응답(배열 형태)은 parseApiError()의 지원
