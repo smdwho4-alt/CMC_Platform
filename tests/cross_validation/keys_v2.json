@@ -1,0 +1,18 @@
+{
+  "_comment": "Commit8-3b HMAC v2 Python/JS 교차검증용 합성 키 레지스트리. 실제 운영 Secret이 아니다.",
+  "now": 1700000000.0,
+  "max_skew_seconds": 120,
+  "keys": [
+    {
+      "key_id": "key-active",
+      "secret": "xval-cross-secret-active-0001",
+      "state": "ACTIVE"
+    },
+    {
+      "key_id": "key-grace",
+      "secret": "xval-cross-secret-grace-0002",
+      "state": "GRACE",
+      "grace_expires_at": 1700172800.0
+    }
+  ]
+}
