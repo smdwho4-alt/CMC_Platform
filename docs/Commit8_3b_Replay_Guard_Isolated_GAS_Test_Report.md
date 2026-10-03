@@ -127,6 +127,37 @@ local_verification/test_dry_run_v3_real_code.py
 
 > Replay 격리 실험 격리 GAS A/B 실측: 누락된 parseJsonStrict_ 보완, 클라이언트 now/maxSkewSeconds 신뢰 제거(서버 시계·서버 상수만 사용), idempotency_key/key_id 필드명 수정, request.secret 의존 제거(서버 측 TestKeyRegistry 도입), 내부오류/입력오류 분류 추가. 로컬(Node/Python) 45건 이상 테스트 및 실제 격리 GAS 배포 대상 60건(exec 53+status 7, s1/s2/s4/s7) A/B 실측으로 검증 — 실제 검증 범위는 s1/s2/s4/s7로 한정되며, 캐시 유실 모사·장애 주입·서버 상한(80건) 초과 차단·운영 연동은 로컬 전용 또는 미검증 상태로 남음.
 
+## 6. 커밋 d130c563 이후 로컬 전용 회귀 검증 (네트워크 없음)
+
+커밋 `d130c563`(저장소 경로 변경·하니스 재작성)에 대해 외부 GAS URL을 전혀 쓰지 않는 로컬 전용 재검증을 수행했다.
+
+**6-1. 기존 단위·통합 테스트 회귀**
+```
+python -m pytest --ignore=tests/cross_validation/gas_replay_experiment -q
+```
+결과: `165 passed, 17 subtests passed in 16.10s`, 실패 0건. 이번 커밋의 저장소 경로 변경이 기존 테스트에 영향을 주지 않았다.
+(참고: 이번 지시에서 "기존 130개"로 언급됐으나, 실제 수집된 기존 테스트 수는 165개였다 — 수치 차이를 확인한 사실만 기록한다.)
+
+**6-2. 이번 커밋 pytest(저장소 경로, 46건)**
+```
+python -m pytest tests/cross_validation/gas_replay_experiment -v
+```
+결과: `46 passed in 265.06s`, 실패 0건. `local_verification/test_e2e_real_gas_code.py`·`test_dry_run_v3_real_code.py`는 `node_harness/node_gas_http_server.js`(저장소 경로)를 서브프로세스로 띄워 호출하며, 둘 다 `allow_real_target=False`로 로컬(`127.0.0.1`)만 대상으로 한다 — 외부 GAS URL 호출 없음.
+
+**6-3. Node 진입점 테스트(저장소 경로) — 결함 발견 및 수정**
+`node tests/cross_validation/gas_replay_experiment/node_harness/entrypoint_tests.js`를 저장소 경로에서 단독 실행하면 `ReferenceError: signV2_ is not defined`로 즉시 실패했다. 원인: `entrypoint_tests.js`는 자기 파일 주석에도 명시돼 있듯 단독 실행용이 아니며, `gas_stubs.js`+`gas_candidate/*.gs`를 먼저 같은 전역 스코프에 로드한 뒤 이어서 평가(eval)해야 하는데, **저장소에는 그 연결을 수행하는 커밋된 실행기가 없었다**(기존 `node_gas_http_server.js`는 HTTP 서버로 감싸는 용도이지 이 테스트 파일을 실행하지 않음). 즉 이 테스트 파일은 코드 자체는 맞지만 저장소 경로만으로는 재현(실행) 불가능한 상태였다 — 이번 지시의 "scratchpad 파일에 의존하지 않고 재현되는지 확인" 기준에 미달.
+
+수정: `node_harness/run_entrypoint_tests.js`를 추가했다(최소 실행기, `node_gas_http_server.js`와 동일한 `GAS_FILE_ORDER`로 `gas_stubs.js`+`gas_candidate/*.gs`+`entrypoint_tests.js`를 연결해 평가). 수정 후 재검증:
+```
+node tests/cross_validation/gas_replay_experiment/node_harness/run_entrypoint_tests.js
+```
+결과: 29개 assertion 전부 `[PASS]`, `ALL_LOCAL_ENTRYPOINT_TESTS_PASSED`, exit code 0. scratchpad 경로를 전혀 참조하지 않고 저장소 파일만으로 재현됨을 확인.
+
+**6-4. 외부 GAS 요청 미실행 확인**
+`concurrent_http_driver.py`/`real_execution_run.py`는 `allow_real_target` 가드가 있고, 이번 재검증에서 쓰인 모든 호출은 `allow_real_target=False`+로컬 Node 서버(`127.0.0.1`) 대상이었다. 저장소 내 유일한 비로컬 URL 리터럴(`test_concurrent_http_driver_local.py`의 `https://example-not-a-real-gas-endpoint.invalid`)은 "`allow_real_target` 없이 비로컬 URL을 거부하는지" 검증하는 더미 값이며 실제 전송은 발생하지 않는다. 이번 재검증에서 외부 GAS URL로의 실제 요청은 전혀 없었다.
+
+**6-5. 변경 내역**: `tests/cross_validation/gas_replay_experiment/node_harness/run_entrypoint_tests.js` 1개 파일 신규 추가(후속 commit으로 보존, 기존 파일 수정 없음).
+
 ---
 
 ## 완료 보고 요약
