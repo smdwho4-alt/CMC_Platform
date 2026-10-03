@@ -1,0 +1,161 @@
+{
+  "results": [
+    {
+      "label": "s1-A-first",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "BUSINESS_EXECUTED",
+      "extra": {}
+    },
+    {
+      "label": "s1-A-replay",
+      "classification": "SERVER_REJECTED",
+      "stage": "NONCE_REJECTED_OR_BLOCKED",
+      "extra": {}
+    },
+    {
+      "label": "s1-A-status",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "STATUS_OK",
+      "extra": {}
+    },
+    {
+      "label": "s1-B-first",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "BUSINESS_EXECUTED",
+      "extra": {}
+    },
+    {
+      "label": "s1-B-replay",
+      "classification": "SERVER_REJECTED",
+      "stage": "NONCE_REJECTED_OR_BLOCKED",
+      "extra": {}
+    },
+    {
+      "label": "s1-B-status",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "STATUS_OK",
+      "extra": {}
+    },
+    {
+      "label": "s2-A-burst",
+      "classification": "SUMMARY",
+      "stage": "",
+      "extra": {
+        "target_label": "REAL_GAS_EXECUTION",
+        "variant": "A",
+        "n_requests": 20,
+        "network_errors": 0,
+        "server_rejected": 19,
+        "server_accepted": 1,
+        "final_business_counter": 2
+      }
+    },
+    {
+      "label": "s2-B-burst",
+      "classification": "SUMMARY",
+      "stage": "",
+      "extra": {
+        "target_label": "REAL_GAS_EXECUTION",
+        "variant": "B",
+        "n_requests": 20,
+        "network_errors": 0,
+        "server_rejected": 19,
+        "server_accepted": 1,
+        "final_business_counter": 2
+      }
+    },
+    {
+      "label": "s4-A-original",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "BUSINESS_EXECUTED",
+      "extra": {}
+    },
+    {
+      "label": "s4-A-retry-same-nonce",
+      "classification": "SERVER_REJECTED",
+      "stage": "NONCE_REJECTED_OR_BLOCKED",
+      "extra": {}
+    },
+    {
+      "label": "s4-A-retry-new-nonce",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "BUSINESS_EXECUTED",
+      "extra": {}
+    },
+    {
+      "label": "s4-A-status",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "STATUS_OK",
+      "extra": {}
+    },
+    {
+      "label": "s4-B-original",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "BUSINESS_EXECUTED",
+      "extra": {}
+    },
+    {
+      "label": "s4-B-retry-same-nonce",
+      "classification": "SERVER_REJECTED",
+      "stage": "NONCE_REJECTED_OR_BLOCKED",
+      "extra": {}
+    },
+    {
+      "label": "s4-B-retry-new-nonce",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "BUSINESS_EXECUTED",
+      "extra": {}
+    },
+    {
+      "label": "s4-B-status",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "STATUS_OK",
+      "extra": {}
+    },
+    {
+      "label": "s7-A-t0-accept",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "BUSINESS_EXECUTED",
+      "extra": {}
+    },
+    {
+      "label": "s7-A-near-boundary-replay",
+      "classification": "SERVER_REJECTED",
+      "stage": "NONCE_REJECTED_OR_BLOCKED",
+      "extra": {}
+    },
+    {
+      "label": "s7-A-after-signature-expiry",
+      "classification": "SERVER_REJECTED",
+      "stage": "SIGNATURE_REJECTED",
+      "extra": {}
+    },
+    {
+      "label": "s7-A-status",
+      "classification": "SERVER_ACCEPTED",
+      "stage": "STATUS_OK",
+      "extra": {}
+    }
+  ],
+  "s2_summaries": {
+    "A": {
+      "target_label": "REAL_GAS_EXECUTION",
+      "variant": "A",
+      "n_requests": 20,
+      "network_errors": 0,
+      "server_rejected": 19,
+      "server_accepted": 1,
+      "final_business_counter": 2
+    },
+    "B": {
+      "target_label": "REAL_GAS_EXECUTION",
+      "variant": "B",
+      "n_requests": 20,
+      "network_errors": 0,
+      "server_rejected": 19,
+      "server_accepted": 1,
+      "final_business_counter": 2
+    }
+  },
+  "computed_total_requests": 60
+}
