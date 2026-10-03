@@ -1,0 +1,501 @@
+// Commit8-3b 격리 GAS 교차검증 패키지 — Fixtures.gs
+// tests/cross_validation/fixtures_v2.json, keys_v2.json을 그대로 옮김(값 변경 없음).
+// 합성 테스트 데이터만 포함한다. 운영 Secret·실제 예약자료 없음.
+// eslint-disable
+
+var FIXTURES = {
+  "_comment": "Commit8-3b HMAC v2 Python/JS 교차검증 공유 fixture. Python(signing_v2.py)과 JS(reference_signing_v2.js)가 이 파일을 동일하게 읽어 각자 출력을 생성한다. 기대값은 이 파일이 아니라 CROSS_VALIDATION_REPORT.md에 별도로 기록한다(한쪽 구현 출력을 기대값으로 자동 채택하지 않음).",
+  "vectors": [
+    {
+      "id": "V01_ascii_normal",
+      "category": "정상 ASCII 입력",
+      "determinacy": "DETERMINED",
+      "note": "표준 ASCII 필드·payload. 정상 서명 후 동일 값으로 검증.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "post",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-ascii-0001",
+        "idempotencyKey": "idem-ascii-0001",
+        "keyId": "key-active",
+        "payload": {
+          "reservationNo": "R-0001",
+          "qty": 2
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V02_korean_unicode_payload",
+      "category": "한글·Unicode payload",
+      "determinacy": "DETERMINED",
+      "note": "payload 키·값에 한글(BMP 범위) 포함. NFC 정규화 전제 하에 양쪽 언어가 동일 해시를 내야 함.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-kor-0002",
+        "idempotencyKey": "idem-kor-0002",
+        "keyId": "key-active",
+        "payload": {
+          "환자명": "홍길동",
+          "메모": "특이사항 없음"
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "UNICODE_OR_INVALID_OBJECT_KEY",
+      "guardNote": "이 벡터의 object key(환자명/메모)는 Unicode라서 Option B 가드가 거절한다. ADR-017 범위의 실제 스키마는 영문 식별자 키만 쓰므로(제안서 §1) 이 거절은 실제 기능에 영향이 없다 — 값(value)에 한글이 오는 것은 V18에서 별도로 ACCEPTED로 확인한다."
+    },
+    {
+      "id": "V03a_payload_key_order_variant_A",
+      "category": "객체 키 순서 정규화",
+      "determinacy": "DETERMINED",
+      "note": "V03b와 동일 의미의 payload를 원본 key 순서만 다르게 기술. sort_keys 적용 후 동일 canonical/hash가 나와야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-order-0003a",
+        "idempotencyKey": "idem-order-0003a",
+        "keyId": "key-active",
+        "payload": {
+          "b": 2,
+          "a": 1,
+          "c": 3
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED",
+      "crossVectorPayloadEquivalenceOf": "V03b_payload_key_order_variant_B"
+    },
+    {
+      "id": "V03b_payload_key_order_variant_B",
+      "category": "객체 키 순서 정규화",
+      "determinacy": "DETERMINED",
+      "note": "V03a와 동일 payload, key 기술 순서만 다름(a,b,c 순). sort_keys 적용 후 payloadHash가 V03a와 '언어 내에서' 동일해야 한다(서로 다른 nonce/idempotencyKey를 쓰므로 canonical string 전체는 다르지만 payloadHash는 같아야 함).",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-order-0003b",
+        "idempotencyKey": "idem-order-0003b",
+        "keyId": "key-active",
+        "payload": {
+          "a": 1,
+          "b": 2,
+          "c": 3
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED",
+      "crossVectorPayloadEquivalenceOf": "V03a_payload_key_order_variant_A"
+    },
+    {
+      "id": "V04_payload_number_type_ambiguity",
+      "category": "숫자 표현 정규화 — raw JSON 경로로 해결",
+      "determinacy": "DETERMINED",
+      "determinacyReason": "최초 버전은 '이미 파싱된 객체 경로'만으로 1.0/1을 구분하려 해 JS에서 통과시키는 구현 한계(UNRESOLVED)가 있었다. 이번 갱신에서 raw JSON 경로(parse_json_strict/parseJsonStrict)가 숫자 리터럴의 원시 토큰 문자열(소수점·지수 유무)을 직접 검사하도록 바꿔, 두 언어 모두 '1.0'·'1e0' 토큰을 FLOAT_OR_EXPONENT_NOT_ALLOWED로 일관되게 거절한다 — RESOLVED_REJECTED로 전환.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-numtype-0004",
+        "idempotencyKey": "idem-numtype-0004",
+        "keyId": "key-active",
+        "payload": {
+          "count": 1.0
+        }
+      },
+      "rawJsonText": "{\"count\":1.0}",
+      "verifyOverrides": {},
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "FLOAT_OR_EXPONENT_NOT_ALLOWED",
+      "guardNote": "raw JSON 경로(parse_json_strict/parseJsonStrict)로 검증하면 '1.0' 토큰 자체에 소수점이 있다는 사실을 양쪽 언어가 동일하게 확인해 거절한다(이미 파싱된 객체 경로의 한계는 여전히 남지만, raw JSON 경로를 먼저 거치면 이 벡터는 서명 경로에 도달하지 않는다).",
+      "parsedObjectPathLimitationNote": "legacyLegacySignFlow 필드(아래)는 '이미 파싱된 객체 경로'만 썼을 때 무슨 일이 벌어지는지 보여주는 역사적 기록용이다 — payload={\"count\": 1.0}을 Python dict로 직접 만들어 signing_v2.compute_payload_hash()/sign_v2()에 바로 넘기면(raw JSON 경로를 거치지 않으면) 아무 경고 없이 서명된다. 이 한계는 문서에 유지한다(이번 작업지시 1번 마지막 항목 재확인).",
+      "legacyParsedObjectPathStillUnresolved": true
+    },
+    {
+      "id": "V05_payload_whitespace_preserved",
+      "category": "payload 문자열 공백",
+      "determinacy": "DETERMINED",
+      "note": "문자열 값 내부의 앞뒤 공백은 트리밍 대상이 아니다(계약에 트리밍 규칙 없음) — 양쪽 언어 모두 공백을 그대로 보존해 동일 해시가 나와야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-ws-0005",
+        "idempotencyKey": "idem-ws-0005",
+        "keyId": "key-active",
+        "payload": {
+          "note": "  공백 포함  "
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V06_payload_null_value",
+      "category": "payload null 처리",
+      "determinacy": "DETERMINED",
+      "note": "JSON null은 양쪽 언어 모두 'null' 리터럴로 직렬화되어 동일 해시가 나와야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-null-0006",
+        "idempotencyKey": "idem-null-0006",
+        "keyId": "key-active",
+        "payload": {
+          "approvedBy": null,
+          "qty": 3
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V07_field_newline_injection_rejected",
+      "category": "필드 구분자·개행 거절",
+      "determinacy": "DETERMINED",
+      "note": "nonce 필드에 LF(\\n)를 삽입해 Canonical String 경계 조작을 시도. 형식 검증(safe-token 정규식)이 제어문자를 원천 차단하므로 양쪽 언어 모두 서명 계산 자체를 거부해야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "bad\nnonce-0007",
+        "idempotencyKey": "idem-inject-0007",
+        "keyId": "key-active",
+        "payload": {
+          "qty": 1
+        }
+      },
+      "verifyOverrides": {},
+      "expectSignError": true,
+      "expectedCategory": "FIELD_FORMAT_INVALID_AT_SIGN",
+      "expectedGuardOutcome": "ACCEPTED",
+      "guardNote": "가드는 payload({\"qty\":1})만 검사하며 ACCEPTED다 — 이 벡터가 실패하는 지점은 nonce 필드(signing_v2.py의 safe-token 검증)이지 payload 스키마가 아니다. 두 검사는 서로 독립적이다."
+    },
+    {
+      "id": "V08_field_safe_token_chars_allowed",
+      "category": "필드 구분자·개행 허용 범위",
+      "determinacy": "DETERMINED",
+      "note": "operation 필드에 safe-token 허용 문자(.,-,:,_)를 포함 — 구분자(LF)가 아니므로 정상 허용되어야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve-and:notify_v2.1",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-safechars-0008",
+        "idempotencyKey": "idem-safechars-0008",
+        "keyId": "key-active",
+        "payload": {
+          "qty": 1
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V09_keyid_tamper",
+      "category": "keyId 변조",
+      "determinacy": "DETERMINED",
+      "note": "key-active로 서명한 뒤 검증 시 key_id를 key-grace(등록된 다른 키)로 바꿔 제시 — 서명 불일치로 거절되어야 한다(키 재시도 없음).",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-keyidtamper-0009",
+        "idempotencyKey": "idem-keyidtamper-0009",
+        "keyId": "key-active",
+        "payload": {
+          "qty": 1
+        }
+      },
+      "verifyOverrides": {
+        "keyId": "key-grace"
+      },
+      "expectedCategory": "SIGNATURE_MISMATCH",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V10_payload_tamper",
+      "category": "payload 변조",
+      "determinacy": "DETERMINED",
+      "note": "서명 후 payload 값을 변경해 검증 — payloadHash가 달라져 서명 불일치로 거절되어야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-payloadtamper-0010",
+        "idempotencyKey": "idem-payloadtamper-0010",
+        "keyId": "key-active",
+        "payload": {
+          "qty": 2
+        }
+      },
+      "verifyOverrides": {
+        "payload": {
+          "qty": 999
+        }
+      },
+      "expectedCategory": "SIGNATURE_MISMATCH",
+      "expectedGuardOutcome": "ACCEPTED",
+      "guardNote": "sign-time payload({\"qty\":2})와 verify-time 변조 payload({\"qty\":999}) 둘 다 정수뿐이라 가드를 통과한다 — 이 벡터가 거절되는 이유는 가드가 아니라 서명 불일치다."
+    },
+    {
+      "id": "V11_signature_tamper",
+      "category": "서명 변조",
+      "determinacy": "DETERMINED",
+      "note": "계산된 서명의 마지막 hex 문자 1개를 결정적 규칙으로 변경(harness가 양쪽 언어에 동일 규칙 적용) — 상수시간 비교에서 불일치로 거절되어야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-sigtamper-0011",
+        "idempotencyKey": "idem-sigtamper-0011",
+        "keyId": "key-active",
+        "payload": {
+          "qty": 1
+        }
+      },
+      "verifyOverrides": {},
+      "tamperSignatureLastHexChar": true,
+      "expectedCategory": "SIGNATURE_MISMATCH",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V12_protocol_version_mismatch_no_fallback",
+      "category": "버전 불일치",
+      "determinacy": "DETERMINED",
+      "note": "검증 시 protocolVersion을 '1'로 제시 — 즉시 PROTOCOL_VERSION_MISMATCH로 거절되어야 하며, v1(8필드) 형식으로 재해석을 시도하지 않아야 한다(코드 경로 자체가 없음).",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-vermismatch-0012",
+        "idempotencyKey": "idem-vermismatch-0012",
+        "keyId": "key-active",
+        "payload": {
+          "qty": 1
+        }
+      },
+      "verifyOverrides": {
+        "protocolVersion": "1"
+      },
+      "expectedCategory": "PROTOCOL_VERSION_MISMATCH",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V13_unicode_surrogate_key_sort_order",
+      "category": "Unicode 키 정렬 순서(미확정)",
+      "determinacy": "UNRESOLVED",
+      "determinacyReason": "계약은 '유니코드 코드포인트순 정렬'만 명시했다. Python str 비교는 실제 코드포인트 기준이지만, JS 기본 문자열 비교(`<`)는 UTF-16 코드 유닛 기준이다. 대부분의 문자(BMP, U+0000~U+D7FF)는 결과가 같지만, U+E000~U+FFFF 범위 문자와 surrogate pair로 표현되는 U+10000 이상 문자를 비교하면 두 기준이 반대 순서를 낼 수 있다(서러게이트 쌍의 상위 바이트가 0xD800~0xDBFF로, 0xE000~0xFFFF보다 수치상 작기 때문). 이 벡터는 그 불일치를 실측으로 보여주며, 계약이 '코드 유닛 기준 정렬'인지 '진짜 코드포인트 기준 정렬'인지 아직 확정하지 않았으므로 이 구현이 임의로 한쪽을 정답으로 정하지 않는다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-surrogatesort-0013",
+        "idempotencyKey": "idem-surrogatesort-0013",
+        "keyId": "key-active",
+        "payload": {
+          "": 1,
+          "😀": 2
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "UNRESOLVED_CROSS_LANGUAGE_MISMATCH_EXPECTED",
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "UNICODE_OR_INVALID_OBJECT_KEY",
+      "guardNote": "두 키 모두 ASCII가 아니므로 Option B 가드가 (정렬 순서 쟁점과 무관하게) 즉시 거절한다 — 가드는 '어느 정렬이 맞는가'를 판단할 필요 자체를 없앤다. 즉 V13의 UNRESOLVED 상태도 RESOLVED_REJECTED로 전환된다."
+    },
+    {
+      "id": "V14_nfc_normalization_consistency",
+      "category": "Unicode NFC 정규화 일관성",
+      "determinacy": "DETERMINED",
+      "note": "동일 글자를 NFD(분해형: e + combining acute accent)로 표현한 payload. 계약(§3)의 NFC 정규화 규칙을 양쪽 언어가 동일하게 적용하면, 이 벡터와 V01 계열처럼 이미 NFC(완성형)인 동등 입력이 '정규화 후' 동일 해시를 내야 한다 — 이 벡터 자체는 NFD 입력이 정규화를 거쳐 정상 처리됨(ACCEPTED)을 확인한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-nfc-0014",
+        "idempotencyKey": "idem-nfc-0014",
+        "keyId": "key-active",
+        "payload": {
+          "name": "café"
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED",
+      "nfcEquivalentPayloadOf": {
+        "name": "café"
+      }
+    },
+    {
+      "id": "V15_guard_integer_out_of_safe_range",
+      "category": "Option B 가드 — 안전정수범위 초과 거절",
+      "determinacy": "DETERMINED",
+      "note": "RFC 8785 Appendix B 권고 안전정수범위(2^53-1)를 넘는 정수는 Option B 가드가 거절한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-guard-range-0015",
+        "idempotencyKey": "idem-guard-range-0015",
+        "keyId": "key-active",
+        "payload": {
+          "bigId": 9007199254740992
+        }
+      },
+      "verifyOverrides": {},
+      "guardOnly": true,
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "INTEGER_OUT_OF_SAFE_RANGE"
+    },
+    {
+      "id": "V16_guard_nested_float_rejected",
+      "category": "Option B 가드 — 중첩 배열 내 float 거절",
+      "determinacy": "DETERMINED",
+      "note": "배열 안에 중첩된 객체의 숫자 필드가 float이면, 가드가 정확한 경로($.items[1].price)와 함께 거절해야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-guard-nestedfloat-0016",
+        "idempotencyKey": "idem-guard-nestedfloat-0016",
+        "keyId": "key-active",
+        "payload": {
+          "items": [
+            {
+              "price": 10
+            },
+            {
+              "price": 10.5
+            }
+          ]
+        }
+      },
+      "verifyOverrides": {},
+      "guardOnly": true,
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "FLOAT_NOT_ALLOWED",
+      "expectedGuardPath": "$.items[1].price"
+    },
+    {
+      "id": "V17_guard_nested_unicode_key_rejected",
+      "category": "Option B 가드 — 중첩 객체 내 Unicode 키 거절",
+      "determinacy": "DETERMINED",
+      "note": "최상위가 아닌 중첩 객체의 키가 Unicode여도 재귀적으로 거절되어야 한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-guard-nestedkey-0017",
+        "idempotencyKey": "idem-guard-nestedkey-0017",
+        "keyId": "key-active",
+        "payload": {
+          "meta": {
+            "환자명": "홍길동"
+          }
+        }
+      },
+      "verifyOverrides": {},
+      "guardOnly": true,
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "UNICODE_OR_INVALID_OBJECT_KEY",
+      "expectedGuardPath": "$.meta.환자명"
+    },
+    {
+      "id": "V18_guard_ascii_key_unicode_value_accepted",
+      "category": "Option B 가드 — ASCII 키 + Unicode 값은 정상 허용",
+      "determinacy": "DETERMINED",
+      "note": "실제 스키마와 동일한 형태(영문 식별자 키 + 한글 값)는 가드를 통과해야 한다 — V02가 보여준 '한글 object key' 거절과 대비되는, '한글 value는 문제 없음'을 보여주는 벡터. 통과 후 payloadHash·canonical·서명은 기존 경로 그대로 Python/JS 교차검증한다.",
+      "sign": {
+        "secretKeyId": "key-active",
+        "method": "POST",
+        "operation": "approve",
+        "timestamp": "1700000000.0",
+        "nonce": "nonce-guard-asciikey-0018",
+        "idempotencyKey": "idem-guard-asciikey-0018",
+        "keyId": "key-active",
+        "payload": {
+          "patientName": "홍길동",
+          "memo": "특이사항 없음"
+        }
+      },
+      "verifyOverrides": {},
+      "expectedCategory": "ACCEPTED",
+      "expectedGuardOutcome": "ACCEPTED"
+    },
+    {
+      "id": "V19_guard_duplicate_key_flat",
+      "category": "Option B 가드 — 원시 JSON 중복 키 거절(평면)",
+      "determinacy": "DETERMINED",
+      "note": "원시 JSON 텍스트 단계에서 평면(최상위) 중복 키를 거절해야 한다. 이미 파싱된 dict로는 복구 불가능한 정보이므로 별도 함수(parse_json_reject_duplicates/parseJsonRejectDuplicates)로 검사한다.",
+      "guardOnly": true,
+      "rawJsonDuplicateCheck": true,
+      "rawJsonText": "{\"qty\":1,\"qty\":2}",
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "DUPLICATE_KEY"
+    },
+    {
+      "id": "V20_guard_duplicate_key_nested",
+      "category": "Option B 가드 — 원시 JSON 중복 키 거절(중첩)",
+      "determinacy": "DETERMINED",
+      "note": "중첩 객체 내부의 중복 키도 거절해야 하며, 서로 다른 객체(형제 범위)의 동일 키 이름은 오탐이 아니어야 한다.",
+      "guardOnly": true,
+      "rawJsonDuplicateCheck": true,
+      "rawJsonText": "{\"a\":{\"x\":1,\"y\":2,\"x\":3},\"b\":{\"x\":9}}",
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "DUPLICATE_KEY"
+    },
+    {
+      "id": "V21_guard_top_level_not_object_rejected",
+      "category": "Option B 가드 — 최상위 payload가 객체가 아님",
+      "determinacy": "DETERMINED",
+      "note": "payload 최상위는 JSON 객체여야 한다(ADR-017 §12 전제). 배열이 오면 거절해야 한다.",
+      "guardOnly": true,
+      "guardDirectPayload": [
+        1,
+        2,
+        3
+      ],
+      "expectedGuardOutcome": "REJECTED",
+      "expectedGuardReason": "TOP_LEVEL_PAYLOAD_MUST_BE_OBJECT"
+    }
+  ]
+};
+
+var SYNTHETIC_KEYS = {
+  "key-active": "xval-cross-secret-active-0001",
+  "key-grace": "xval-cross-secret-grace-0002"
+};
+
+var NOW = 1700000000.0;
+var MAX_SKEW_SECONDS = 120;
